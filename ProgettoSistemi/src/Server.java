@@ -59,6 +59,7 @@ public class Server {
                             subscribeToTopic(argument);
                             out.println("Iscritto al topic: " + argument);
                             break;
+                        //TODO Se si fa subscribe di qualche topic inesistente non deve essere possibile farlo
                         case "send":
                             if ("publisher".equals(role)) {
                                 sendMessage(topic, argument);
@@ -150,7 +151,7 @@ public class Server {
 
         private void listAllMessages(PrintWriter out, String topic) {
             List<Message> messages = topics.get(topic);
-            synchronized (messages) {
+            synchronized (messages) { //TODO se faccio listall di un topic vuoto, QUANDO SONO ISCRITTO A PIU' DI UN TOPIC messages è null e quindi si blocca il metodo synchronized
                 if (messages.isEmpty()) {
                     out.println("Nessun messaggio trovato.");
                 } else {
