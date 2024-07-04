@@ -27,7 +27,7 @@ public class Server {
 
         public ClientHandler(Socket socket) {
             this.socket = socket;
-            this.clientAddress = socket.getInetAddress().getHostAddress();
+            this.clientAddress = socket.getInetAddress().getHostAddress() + ":" + socket.getPort();
             System.out.println("Nuovo client connesso: " + clientAddress);
         }
 
@@ -116,6 +116,8 @@ public class Server {
                         out.println("  Testo: " + msg.getText());
                         out.println("  Data: " + msg.getTimestamp());
                     }
+                    out.println("Fine ciclo messaggi.");
+                    out.flush(); // Aggiungi flush per assicurarti che tutti i messaggi siano inviati al client
                 }
             }
         }

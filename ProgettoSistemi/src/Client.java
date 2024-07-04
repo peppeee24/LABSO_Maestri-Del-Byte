@@ -18,16 +18,31 @@ public class Client {
 
             System.out.println("Connesso al server su " + SERVER_ADDRESS + ":" + SERVER_PORT);
             String input;
-            while ((input = userInput.readLine()) != null) {
-                out.println(input);
-                String response;
-                while ((response = in.readLine()) != null) {
-                    System.out.println("Risposta del server: " + response);
-                    if (!in.ready()) break;
+            while (true) {
+                // Legge l'input dell'utente
+                if (userInput.ready()) {
+                    input = userInput.readLine();
+                    out.println(input);
+                    out.flush(); // Assicurati che i dati siano inviati immediatamente
+
+                    // Legge e stampa le risposte dal server
+                    String response;
+                    while (in.ready() && (response = in.readLine()) != null) {
+                        System.out.println("Risposta del server: " + response);
+                    }
+
+                    if (input.equals("quit")) {
+                        System.out.println("Disconnesso dal server.");
+                        break;
+                    }
                 }
-                if (input.equals("quit")) {
-                    System.out.println("Disconnesso dal server.");
-                    break;
+
+                // Legge e stampa le risposte dal server quando non c'è input dell'utente
+                if (in.ready()) {
+                    String response;
+                    while (in.ready() && (response = in.readLine()) != null) {
+                        System.out.println("Risposta del server: " + response);
+                    }
                 }
             }
         } catch (IOException e) {
