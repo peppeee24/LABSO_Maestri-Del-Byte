@@ -1,12 +1,13 @@
 import java.io.*;
 import java.net.*;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.*;
 
 public class Server {
     private static final int PORT = 9000;
-    private static Map<String, List<String>> topics = new ConcurrentHashMap<>();
-    private static Map<String, List<Socket>> subscribers = new ConcurrentHashMap<>();
+    private static Map<String, List<Message>> topics = new ConcurrentHashMap<>();
+    private static Map<String, Map<String, List<Message>>> publisherMessages = new ConcurrentHashMap<>();
 
     public static void main(String[] args) {
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
@@ -21,10 +22,13 @@ public class Server {
 
     private static class ClientHandler extends Thread {
         private Socket socket;
+        private String publisherTopic;
+        private String clientAddress;
 
         public ClientHandler(Socket socket) {
             this.socket = socket;
-            System.out.println("Nuovo client connesso: " + socket.getInetAddress().getHostAddress());
+            this.clientAddress = socket.getInetAddress().getHostAddress();
+            System.out.println("Nuovo client connesso: " + clientAddress);
         }
 
         public void run() {
@@ -40,65 +44,104 @@ public class Server {
 
                     switch (command) {
                         case "publish":
+                            publisherTopic = argument;
                             out.println("Publisher registrato per il topic: " + argument);
                             topics.putIfAbsent(argument, new ArrayList<>());
-                            break;
-                        case "subscribe":
-                            out.println("Iscritto al topic: " + argument);
-                            subscribers.putIfAbsent(argument, new ArrayList<>());
-                            subscribers.get(argument).add(socket);
+                            publisherMessages.putIfAbsent(clientAddress, new ConcurrentHashMap<>());
+                            publisherMessages.get(clientAddress).putIfAbsent(argument, new ArrayList<>());
                             break;
                         case "send":
-                            String[] msgParts = argument.split(" ", 2);
-                            String topic = msgParts[0];
-                            String message = msgParts[1];
-                            topics.get(topic).add(message);
-                            if (subscribers.containsKey(topic)) {
-                                for (Socket s : subscribers.get(topic)) {
-                                    PrintWriter clientOut = new PrintWriter(s.getOutputStream(), true);
-                                    clientOut.println("Nuovo messaggio su " + topic + ": " + message);
-                                }
+                            if (publisherTopic != null) {
+                                sendMessage(publisherTopic, argument);
+                                out.println("Messaggio inviato sul topic: " + publisherTopic);
+                            } else {
+                                out.println("Devi prima registrarti come publisher utilizzando il comando 'publish <topic>'");
                             }
                             break;
                         case "list":
-                            out.println("Messaggi: " + String.join(", ", topics.getOrDefault(argument, Collections.emptyList())));
+                            if (publisherTopic != null) {
+                                listMessages(out, publisherTopic, false);
+                            } else {
+                                out.println("Devi prima registrarti come publisher utilizzando il comando 'publish <topic>'");
+                            }
                             break;
                         case "listall":
-                            StringBuilder allMessages = new StringBuilder();
-                            for (Map.Entry<String, List<String>> entry : topics.entrySet()) {
-                                allMessages.append(entry.getKey()).append(": ").append(String.join(", ", entry.getValue())).append("\n");
+                            if (publisherTopic != null) {
+                                listMessages(out, publisherTopic, true);
+                            } else {
+                                out.println("Devi prima registrarti come publisher utilizzando il comando 'publish <topic>'");
                             }
-                            out.println(allMessages.toString());
                             break;
                         case "quit":
                             out.println("Arrivederci!");
                             socket.close();
-                            System.out.println("Client disconnesso: " + socket.getInetAddress().getHostAddress());
+                            System.out.println("Client disconnesso: " + clientAddress);
                             return;
-                        case "help":
-                            out.println(getHelp());
-                            break;
                         default:
                             out.println("Comando sconosciuto: " + command);
                     }
-
-
-
                 }
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
+
+        private void sendMessage(String topic, String message) {
+            List<Message> messages = topics.get(topic);
+            Message newMessage = new Message(messages.size() + 1, message);
+            synchronized (messages) {
+                messages.add(newMessage);
+            }
+            Map<String, List<Message>> clientMessages = publisherMessages.get(clientAddress);
+            List<Message> publisherMsgs = clientMessages.get(topic);
+            synchronized (publisherMsgs) {
+                publisherMsgs.add(newMessage);
+            }
+        }
+
+        private void listMessages(PrintWriter out, String topic, boolean includeAll) {
+            List<Message> messages;
+            if (includeAll) {
+                messages = topics.get(topic);
+            } else {
+                messages = publisherMessages.get(clientAddress).get(topic);
+            }
+            synchronized (messages) {
+                if (messages.isEmpty()) {
+                    out.println("Nessun messaggio trovato.");
+                } else {
+                    out.println("Messaggi:");
+                    for (Message msg : messages) {
+                        out.println("- ID: " + msg.getId());
+                        out.println("  Testo: " + msg.getText());
+                        out.println("  Data: " + msg.getTimestamp());
+                    }
+                }
+            }
+        }
     }
 
-    private static String getHelp() {
-        return "Comandi disponibili:\n" +
-                "publish <topic>: Registra un publisher per il topic specificato.\n" +
-                "subscribe <topic>: Iscrive il client al topic specificato.\n" +
-                "send <topic> <message>: Invia un messaggio al topic specificato.\n" +
-                "list <topic>: Elenca tutti i messaggi per il topic specificato.\n" +
-                "listall: Elenca tutti i messaggi per tutti i topic.\n" +
-                "quit: Disconnette il client dal server.\n" +
-                "help: Mostra questa lista di comandi.";
+    private static class Message {
+        private final int id;
+        private final String text;
+        private final String timestamp;
+
+        public Message(int id, String text) {
+            this.id = id;
+            this.text = text;
+            this.timestamp = new SimpleDateFormat("dd/MM/yyyy - HH:mm:ss").format(new Date());
+        }
+
+        public int getId() {
+            return id;
+        }
+
+        public String getText() {
+            return text;
+        }
+
+        public String getTimestamp() {
+            return timestamp;
+        }
     }
 }

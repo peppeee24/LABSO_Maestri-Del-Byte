@@ -20,8 +20,11 @@ public class Client {
             String input;
             while ((input = userInput.readLine()) != null) {
                 out.println(input);
-                String response = in.readLine();
-                System.out.println("Risposta del server: " + response);
+                String response;
+                while ((response = in.readLine()) != null) {
+                    System.out.println("Risposta del server: " + response);
+                    if (!in.ready()) break;
+                }
                 if (input.equals("quit")) {
                     System.out.println("Disconnesso dal server.");
                     break;
