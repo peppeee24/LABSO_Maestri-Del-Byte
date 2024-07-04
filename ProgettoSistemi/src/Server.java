@@ -8,12 +8,7 @@ public class Server {
     private static final int PORT = 9000;
     private static Map<String, List<Message>> topics = new ConcurrentHashMap<>();
     private static Map<String, Map<String, List<Message>>> publisherMessages = new ConcurrentHashMap<>();
-    private static final String HELP_MESSAGE = "Comandi disponibili:\n" +
-            "publish <topic> - Registra il publisher per il topic specificato\n" +
-            "send <message> - Invia un messaggio al topic registrato\n" +
-            "list - Elenca i messaggi inviati dal publisher corrente\n" +
-            "listall - Elenca tutti i messaggi nel topic registrato\n" +
-            "quit - Disconnette il client\n";
+
 
     public static void main(String[] args) {
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
@@ -79,7 +74,7 @@ public class Server {
                             }
                             break;
                         case "help":
-                            out.println(HELP_MESSAGE);
+                            out.println(getHelp());
                             break;
                         case "show":
                             showTopics(out);
@@ -92,10 +87,24 @@ public class Server {
                         default:
                             out.println("Comando sconosciuto: " + command);
                     }
+
                 }
+
             } catch (IOException e) {
                 e.printStackTrace();
             }
+
+        }
+
+        private static String getHelp() {
+            return "Comandi disponibili:\n" +
+                    "publish <topic>: Registra un publisher per il topic specificato.\n" +
+                    "subscribe <topic>: Iscrive il client al topic specificato.\n" +
+                    "send <topic> <message>: Invia un messaggio al topic specificato.\n" +
+                    "list <topic>: Elenca tutti i messaggi per il topic specificato.\n" +
+                    "listall: Elenca tutti i messaggi per tutti i topic.\n" +
+                    "quit: Disconnette il client dal server.\n" +
+                    "help: Mostra questa lista di comandi.";
         }
 
         private void sendMessage(String topic, String message) {
