@@ -119,7 +119,6 @@ public class Server {
                         out.println("  Testo: " + msg.getText());
                         out.println("  Data: " + msg.getTimestamp());
                     }
-                    out.println("Fine ciclo messaggi.");
                     out.flush(); // Aggiungi flush per assicurarti che tutti i messaggi siano inviati al client
                 }
             }
