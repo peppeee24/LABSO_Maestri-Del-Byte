@@ -75,13 +75,30 @@ public class Server {
                             socket.close();
                             System.out.println("Client disconnesso: " + socket.getInetAddress().getHostAddress());
                             return;
+                        case "help":
+                            out.println(getHelp());
+                            break;
                         default:
                             out.println("Comando sconosciuto: " + command);
                     }
+
+
+
                 }
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
+    }
+
+    private static String getHelp() {
+        return "Comandi disponibili:\n" +
+                "publish <topic>: Registra un publisher per il topic specificato.\n" +
+                "subscribe <topic>: Iscrive il client al topic specificato.\n" +
+                "send <topic> <message>: Invia un messaggio al topic specificato.\n" +
+                "list <topic>: Elenca tutti i messaggi per il topic specificato.\n" +
+                "listall: Elenca tutti i messaggi per tutti i topic.\n" +
+                "quit: Disconnette il client dal server.\n" +
+                "help: Mostra questa lista di comandi.";
     }
 }
