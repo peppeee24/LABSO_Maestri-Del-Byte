@@ -8,7 +8,7 @@ public class Server {
     private static final int PORT = 9000;
     private static Map<String, List<Message>> topics = new ConcurrentHashMap<>();
     private static Map<String, Map<String, List<Message>>> publisherMessages = new ConcurrentHashMap<>();
-
+    private static Map<String, List<Socket>> subscribers = new ConcurrentHashMap<>();
 
     public static void main(String[] args) {
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
@@ -23,8 +23,9 @@ public class Server {
 
     private static class ClientHandler extends Thread {
         private Socket socket;
-        private String publisherTopic;
+        private String topic;
         private String clientAddress;
+        private String role;
 
         public ClientHandler(Socket socket) {
             this.socket = socket;
@@ -45,32 +46,39 @@ public class Server {
 
                     switch (command) {
                         case "publish":
-                            publisherTopic = argument;
+                            role = "publisher";
+                            topic = argument;
                             out.println("Publisher registrato per il topic: " + argument);
                             topics.putIfAbsent(argument, new ArrayList<>());
                             publisherMessages.putIfAbsent(clientAddress, new ConcurrentHashMap<>());
                             publisherMessages.get(clientAddress).putIfAbsent(argument, new ArrayList<>());
                             break;
+                        case "subscribe":
+                            role = "subscriber";
+                            topic = argument;
+                            subscribeToTopic(argument);
+                            out.println("Iscritto al topic: " + argument);
+                            break;
                         case "send":
-                            if (publisherTopic != null) {
-                                sendMessage(publisherTopic, argument);
-                                out.println("Messaggio inviato sul topic: " + publisherTopic);
+                            if ("publisher".equals(role)) {
+                                sendMessage(topic, argument);
+                                out.println("Messaggio inviato sul topic: " + topic);
                             } else {
                                 out.println("Devi prima registrarti come publisher utilizzando il comando 'publish <topic>'");
                             }
                             break;
                         case "list":
-                            if (publisherTopic != null) {
-                                listMessages(out, publisherTopic, false);
+                            if ("publisher".equals(role)) {
+                                listMessages(out, topic, false);
                             } else {
                                 out.println("Devi prima registrarti come publisher utilizzando il comando 'publish <topic>'");
                             }
                             break;
                         case "listall":
-                            if (publisherTopic != null) {
-                                listMessages(out, publisherTopic, true);
+                            if (topic != null) {
+                                listAllMessages(out, topic);
                             } else {
-                                out.println("Devi prima registrarti come publisher utilizzando il comando 'publish <topic>'");
+                                out.println("Devi prima registrarti come publisher o subscriber utilizzando il comando 'publish <topic>' o 'subscribe <topic>'");
                             }
                             break;
                         case "help":
@@ -87,21 +95,18 @@ public class Server {
                         default:
                             out.println("Comando sconosciuto: " + command);
                     }
-
                 }
-
             } catch (IOException e) {
                 e.printStackTrace();
             }
-
         }
 
         private static String getHelp() {
             return "Comandi disponibili:\n" +
                     "publish <topic>: Registra un publisher per il topic specificato.\n" +
                     "subscribe <topic>: Iscrive il client al topic specificato.\n" +
-                    "send <topic> <message>: Invia un messaggio al topic specificato.\n" +
-                    "list <topic>: Elenca tutti i messaggi per il topic specificato.\n" +
+                    "send <message>: Invia un messaggio al topic specificato.\n" +
+                    "list: Elenca tutti i messaggi per il topic specificato.\n" +
                     "listall: Elenca tutti i messaggi per tutti i topic.\n" +
                     "quit: Disconnette il client dal server.\n" +
                     "help: Mostra questa lista di comandi.";
@@ -118,6 +123,7 @@ public class Server {
             synchronized (publisherMsgs) {
                 publisherMsgs.add(newMessage);
             }
+            notifySubscribers(topic, newMessage);
         }
 
         private void listMessages(PrintWriter out, String topic, boolean includeAll) {
@@ -137,7 +143,51 @@ public class Server {
                         out.println("  Testo: " + msg.getText());
                         out.println("  Data: " + msg.getTimestamp());
                     }
-                    out.flush(); // Aggiungi flush per assicurarti che tutti i messaggi siano inviati al client
+                    out.flush();
+                }
+            }
+        }
+
+        private void listAllMessages(PrintWriter out, String topic) {
+            List<Message> messages = topics.get(topic);
+            synchronized (messages) {
+                if (messages.isEmpty()) {
+                    out.println("Nessun messaggio trovato.");
+                } else {
+                    out.println("Tutti i messaggi sul topic " + topic + ": ");
+                    for (Message msg : messages) {
+                        out.println("- ID: " + msg.getId());
+                        out.println("  Testo: " + msg.getText());
+                        out.println("  Data: " + msg.getTimestamp());
+                    }
+                    out.flush();
+                }
+            }
+        }
+
+        private void subscribeToTopic(String topic) {
+            subscribers.putIfAbsent(topic, new ArrayList<>());
+            synchronized (subscribers.get(topic)) {
+                subscribers.get(topic).add(socket);
+            }
+        }
+
+        private void notifySubscribers(String topic, Message message) {
+            List<Socket> subscriberSockets = subscribers.get(topic);
+            if (subscriberSockets != null) {
+                synchronized (subscriberSockets) {
+                    for (Socket subscriberSocket : subscriberSockets) {
+                        try {
+                            PrintWriter subscriberOut = new PrintWriter(subscriberSocket.getOutputStream(), true);
+                            subscriberOut.println("Nuovo messaggio su " + topic + ":");
+                            subscriberOut.println("- ID: " + message.getId());
+                            subscriberOut.println("  Testo: " + message.getText());
+                            subscriberOut.println("  Data: " + message.getTimestamp());
+                            subscriberOut.flush();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
                 }
             }
         }
