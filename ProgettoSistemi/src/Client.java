@@ -5,6 +5,7 @@ public class Client {
     private static String SERVER_ADDRESS = "127.0.0.1";
     private static int SERVER_PORT = 9000;
 
+
     public static void main(String[] args) {
         if (args.length == 2) {
             SERVER_ADDRESS = args[0];
@@ -17,6 +18,7 @@ public class Client {
              BufferedReader userInput = new BufferedReader(new InputStreamReader(System.in))) {
 
             System.out.println("Connesso al server su " + SERVER_ADDRESS + ":" + SERVER_PORT);
+            System.out.println("Digita il comando 'help' per visualizzare tutte le funzioni");
             String input;
             while (true) {
                 // Legge l'input dell'utente

@@ -8,6 +8,12 @@ public class Server {
     private static final int PORT = 9000;
     private static Map<String, List<Message>> topics = new ConcurrentHashMap<>();
     private static Map<String, Map<String, List<Message>>> publisherMessages = new ConcurrentHashMap<>();
+    private static final String HELP_MESSAGE = "Comandi disponibili:\n" +
+            "publish <topic> - Registra il publisher per il topic specificato\n" +
+            "send <message> - Invia un messaggio al topic registrato\n" +
+            "list - Elenca i messaggi inviati dal publisher corrente\n" +
+            "listall - Elenca tutti i messaggi nel topic registrato\n" +
+            "quit - Disconnette il client\n";
 
     public static void main(String[] args) {
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
@@ -71,6 +77,9 @@ public class Server {
                             } else {
                                 out.println("Devi prima registrarti come publisher utilizzando il comando 'publish <topic>'");
                             }
+                            break;
+                        case "help":
+                            out.println(HELP_MESSAGE);
                             break;
                         case "show":
                             showTopics(out);
