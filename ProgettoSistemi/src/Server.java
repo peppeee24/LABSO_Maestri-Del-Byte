@@ -72,6 +72,9 @@ public class Server {
                                 out.println("Devi prima registrarti come publisher utilizzando il comando 'publish <topic>'");
                             }
                             break;
+                        case "show":
+                            showTopics(out);
+                            break;
                         case "quit":
                             out.println("Arrivederci!");
                             socket.close();
@@ -118,6 +121,18 @@ public class Server {
                     }
                     out.println("Fine ciclo messaggi.");
                     out.flush(); // Aggiungi flush per assicurarti che tutti i messaggi siano inviati al client
+                }
+            }
+        }
+
+        private void showTopics(PrintWriter out) {
+            Set<String> topicList = topics.keySet();
+            if (topicList.isEmpty()) {
+                out.println("Nessun topic trovato.");
+            } else {
+                out.println("Topics:");
+                for (String topic : topicList) {
+                    out.println("- " + topic);
                 }
             }
         }
