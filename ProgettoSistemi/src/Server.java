@@ -70,6 +70,7 @@ public class Server {
                         case "inspect":
                             inspectTopic(consoleReader, argument);
                             break;
+                            // TODO aggiungere possibilità di eliminare un topic
                         default:
                             System.out.println("Comando sconosciuto: " + mainCommand);
                     }
