@@ -17,6 +17,7 @@ public class Client {
              BufferedReader userInput = new BufferedReader(new InputStreamReader(System.in))) {
 
             System.out.println("Connesso al server su " + SERVER_ADDRESS + ":" + SERVER_PORT);
+            System.out.println("Digita help per visualizzare tutti i comandi");
             String input;
             while (true) {
                 // Controlla l'input dell'utente

@@ -9,15 +9,161 @@ public class Server {
     private static Map<String, List<Message>> topics = new ConcurrentHashMap<>();
     private static Map<String, Map<String, List<Message>>> publisherMessages = new ConcurrentHashMap<>();
     private static Map<String, List<Socket>> subscribers = new ConcurrentHashMap<>();
+    private static List<ClientHandler> clientHandlers = new ArrayList<>();
+    private static boolean isRunning = true;
 
     public static void main(String[] args) {
+        new CommandHandler().start();  // Start the command handler thread
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
             System.out.println("Il server è in ascolto sulla porta " + PORT);
-            while (true) {
-                new ClientHandler(serverSocket.accept()).start();
+            while (isRunning) {
+                try {
+                    Socket socket = serverSocket.accept();
+                    ClientHandler clientHandler = new ClientHandler(socket);
+                    clientHandlers.add(clientHandler);
+                    clientHandler.start();
+                } catch (SocketException e) {
+                    // SocketException will be thrown when serverSocket is closed
+                    if (isRunning) {
+                        e.printStackTrace();
+                    }
+                }
             }
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            // Close all client connections when server shuts down
+            disconnectAllClients();
+            System.exit(0);
+        }
+    }
+
+    private static void disconnectAllClients() {
+        for (ClientHandler clientHandler : clientHandlers) {
+            clientHandler.interrupt();
+            clientHandler.disconnect();
+        }
+    }
+
+    private static class CommandHandler extends Thread {
+        public void run() {
+            try (BufferedReader consoleReader = new BufferedReader(new InputStreamReader(System.in))) {
+                String command;
+                while ((command = consoleReader.readLine()) != null) {
+                    String[] parts = command.split(" ", 2);
+                    String mainCommand = parts[0];
+                    String argument = parts.length > 1 ? parts[1] : "";
+
+                    switch (mainCommand) {
+                        case "quit":
+                            isRunning = false;
+                            System.out.println("Il server sta chiudendo...");
+                            disconnectAllClients();
+                            System.exit(0);
+                            return;  // Exit the thread
+                        case "show":
+                            showTopics();
+                            break;
+                        case "admin":
+                            showAdminCommands();
+                            break;
+                        case "inspect":
+                            inspectTopic(consoleReader, argument);
+                            break;
+                        default:
+                            System.out.println("Comando sconosciuto: " + mainCommand);
+                    }
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        private void showAdminCommands() {
+            System.out.println("Comandi amministrativi disponibili:");
+            System.out.println("quit: disconnette tutti i client");
+            System.out.println("show: mostra la lista di tutti i topic");
+            System.out.println("inspect <topic>: apre una sessione interattiva per analizzare un topic");
+        }
+
+        private void showTopics() {
+            Set<String> topicList = topics.keySet();
+            if (topicList.isEmpty()) {
+                System.out.println("Nessun topic trovato.");
+            } else {
+                System.out.println("Topics:");
+                for (String topic : topicList) {
+                    System.out.println("- " + topic);
+                }
+            }
+        }
+
+        private void inspectTopic(BufferedReader consoleReader, String topic) throws IOException {
+            if (!topics.containsKey(topic)) {
+                System.out.println("Il topic " + topic + " non esiste.");
+                return;
+            }
+
+            System.out.println("Sessione interattiva per il topic: " + topic);
+            System.out.println("Comandi disponibili: :listall, :delete <id>, :end");
+
+            String line;
+            while ((line = consoleReader.readLine()) != null) {
+                String[] parts = line.split(" ", 2);
+                String command = parts[0];
+                String argument = parts.length > 1 ? parts[1] : "";
+
+                switch (command) {
+                    case ":listall":
+                        listAllMessages(topic);
+                        break;
+                    case ":delete":
+                        try {
+                            int id = Integer.parseInt(argument);
+                            deleteMessage(topic, id);
+                        } catch (NumberFormatException e) {
+                            System.out.println("ID non valido: " + argument);
+                        }
+                        break;
+                    case ":end":
+                        System.out.println("Sessione interattiva terminata.");
+                        return;
+                    default:
+                        System.out.println("Comando interattivo sconosciuto: " + command);
+                }
+            }
+        }
+
+        private void listAllMessages(String topic) {
+            List<Message> messages = topics.get(topic);
+            if (messages == null) {
+                System.out.println("Il topic " + topic + " non esiste.");
+                return;
+            }
+            synchronized (messages) {
+                if (messages.isEmpty()) {
+                    System.out.println("Nessun messaggio trovato.");
+                } else {
+                    System.out.println("Tutti i messaggi sul topic " + topic + ": ");
+                    for (Message msg : messages) {
+                        System.out.println("- ID: " + msg.getId());
+                        System.out.println("  Testo: " + msg.getText());
+                        System.out.println("  Data: " + msg.getTimestamp());
+                    }
+                }
+            }
+        }
+
+        private void deleteMessage(String topic, int id) {
+            List<Message> messages = topics.get(topic);
+            synchronized (messages) {
+                boolean removed = messages.removeIf(msg -> msg.getId() == id);
+                if (removed) {
+                    System.out.println("Messaggio con ID " + id + " eliminato.");
+                } else {
+                    System.out.println("Messaggio con ID " + id + " non trovato.");
+                }
+            }
         }
     }
 
@@ -26,6 +172,7 @@ public class Server {
         private String topic;
         private String clientAddress;
         private String role;
+        private PrintWriter out;
 
         public ClientHandler(Socket socket) {
             this.socket = socket;
@@ -34,11 +181,14 @@ public class Server {
         }
 
         public void run() {
-            try (BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                 PrintWriter out = new PrintWriter(socket.getOutputStream(), true)) {
-
+            try (BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
+                out = new PrintWriter(socket.getOutputStream(), true);
                 String line;
                 while ((line = in.readLine()) != null) {
+                    if (Thread.currentThread().isInterrupted()) {
+                        return;  // Exit the thread if interrupted
+                    }
+
                     System.out.println("Comando ricevuto: " + line);
                     String[] parts = line.split(" ", 2);
                     String command = parts[0];
@@ -48,6 +198,10 @@ public class Server {
                         case "publish":
                             role = "publisher";
                             topic = argument;
+                            if (argument.isEmpty()) {
+                                out.println("Devi inserire il titolo del topic");
+                                break;
+                            }
                             out.println("Publisher registrato per il topic: " + argument);
                             topics.putIfAbsent(argument, new ArrayList<>());
                             publisherMessages.putIfAbsent(clientAddress, new ConcurrentHashMap<>());
@@ -64,9 +218,11 @@ public class Server {
                             }
                             break;
                         case "send":
-                            if ("publisher".equals(role)) {
+                            if ("publisher".equals(role) && !argument.isEmpty()) {
                                 sendMessage(topic, argument);
                                 out.println("Messaggio inviato sul topic: " + topic);
+                            } else if (argument.isEmpty()) {
+                                out.println("Il messaggio è vuoto, riprova");
                             } else {
                                 out.println("Devi prima registrarti come publisher utilizzando il comando 'publish <topic>'");
                             }
@@ -93,12 +249,24 @@ public class Server {
                             break;
                         case "quit":
                             out.println("Arrivederci!");
-                            socket.close();
-                            System.out.println("Client disconnesso: " + clientAddress);
+                            disconnect();
                             return;
                         default:
                             out.println("Comando sconosciuto: " + command);
                     }
+                }
+            } catch (IOException e) {
+                if (isRunning) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        public void disconnect() {
+            try {
+                if (!socket.isClosed()) {
+                    out.println("Il server ha terminato la connessione");
+                    socket.close();
                 }
             } catch (IOException e) {
                 e.printStackTrace();
@@ -112,6 +280,7 @@ public class Server {
                     "send <message>: Invia un messaggio al topic specificato.\n" +
                     "list: Elenca tutti i messaggi per il topic specificato.\n" +
                     "listall: Elenca tutti i messaggi per tutti i topic.\n" +
+                    "show: Mostra tutti i topic creati da tutti i client.\n" +
                     "quit: Disconnette il client dal server.\n" +
                     "help: Mostra questa lista di comandi.";
         }
@@ -158,8 +327,7 @@ public class Server {
                 out.println("Il topic " + topic + " non esiste.");
                 return;
             }
-            synchronized (messages)
-            {
+            synchronized (messages) {
                 if (messages.isEmpty()) {
                     out.println("Nessun messaggio trovato.");
                 } else {
