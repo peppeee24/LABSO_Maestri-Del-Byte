@@ -23,7 +23,7 @@ public class Server {
                     clientHandlers.add(clientHandler);
                     clientHandler.start();
                 } catch (SocketException e) {
-                    // SocketException will be thrown when serverSocket is closed
+
                     if (isRunning) {
                         e.printStackTrace();
                     }
