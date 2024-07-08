@@ -11,6 +11,9 @@ public class Server {
     private static Map<String, List<Socket>> subscribers = new ConcurrentHashMap<>();
     private static List<ClientHandler> clientHandlers = new ArrayList<>();
     private static boolean isRunning = true;
+    private static Set<String> lockedTopics = ConcurrentHashMap.newKeySet();
+    private static Map<String, Queue<PendingMessage>> pendingMessages = new ConcurrentHashMap<>();
+    private static Map<String, Integer> lastMessageId = new ConcurrentHashMap<>();
 
     public static void main(String[] args) {
         new CommandHandler().start();  // Start the command handler thread
@@ -23,7 +26,6 @@ public class Server {
                     clientHandlers.add(clientHandler);
                     clientHandler.start();
                 } catch (SocketException e) {
-
                     if (isRunning) {
                         e.printStackTrace();
                     }
@@ -54,25 +56,30 @@ public class Server {
                     String mainCommand = parts[0];
                     String argument = parts.length > 1 ? parts[1] : "";
 
-                    switch (mainCommand) {
-                        case "quit":
-                            isRunning = false;
-                            System.out.println("Il server sta chiudendo...");
-                            disconnectAllClients();
-                            System.exit(0);
-                            return;  // Exit the thread
-                        case "show":
-                            showTopics();
-                            break;
-                        case "admin":
-                            showAdminCommands();
-                            break;
-                        case "inspect":
-                            inspectTopic(consoleReader, argument);
-                            break;
-                            // TODO aggiungere possibilità di eliminare un topic
-                        default:
-                            System.out.println("Comando sconosciuto: " + mainCommand);
+                    synchronized (lockedTopics) {
+                        if (lockedTopics.isEmpty()) {
+                            switch (mainCommand) {
+                                case "quit":
+                                    isRunning = false;
+                                    System.out.println("Il server sta chiudendo...");
+                                    disconnectAllClients();
+                                    System.exit(0);
+                                    return;  // Exit the thread
+                                case "show":
+                                    showTopics();
+                                    break;
+                                case "admin":
+                                    showAdminCommands();
+                                    break;
+                                case "inspect":
+                                    inspectTopic(consoleReader, argument);
+                                    break;
+                                default:
+                                    System.out.println("Comando sconosciuto: " + mainCommand);
+                            }
+                        } else {
+                            System.out.println("Comando disabilitato durante una sessione interattiva.");
+                        }
                     }
                 }
             } catch (IOException e) {
@@ -99,11 +106,15 @@ public class Server {
             }
         }
 
-        // TODO QUANDO IL SERVER E IN MODALITA INTERATTIVA, I CLIENT NON POSSONO FARE COMANDI E QUELLI CHE FANNO, VANNO MESSI IN ATTESA FINO A CHE LA SESSIONE NON TERMINA
         private void inspectTopic(BufferedReader consoleReader, String topic) throws IOException {
             if (!topics.containsKey(topic)) {
                 System.out.println("Il topic " + topic + " non esiste.");
                 return;
+            }
+
+            synchronized (lockedTopics) {
+                lockedTopics.add(topic);
+                pendingMessages.putIfAbsent(topic, new LinkedList<>());
             }
 
             System.out.println("Sessione interattiva per il topic: " + topic);
@@ -129,6 +140,10 @@ public class Server {
                         break;
                     case ":end":
                         System.out.println("Sessione interattiva terminata.");
+                        synchronized (lockedTopics) {
+                            lockedTopics.remove(topic);
+                            processPendingMessages(topic);
+                        }
                         return;
                     default:
                         System.out.println("Comando interattivo sconosciuto: " + command);
@@ -143,6 +158,8 @@ public class Server {
                 return;
             }
             synchronized (messages) {
+                int messageCount = messages.size();
+                System.out.println("Sono stati inviati " + messageCount + " messaggi in questo topic.");
                 if (messages.isEmpty()) {
                     System.out.println("Nessun messaggio trovato.");
                 } else {
@@ -165,6 +182,66 @@ public class Server {
                 } else {
                     System.out.println("Messaggio con ID " + id + " non trovato.");
                 }
+            }
+        }
+
+        private void processPendingMessages(String topic) {
+            Queue<PendingMessage> queue = pendingMessages.get(topic);
+            if (queue != null) {
+                while (!queue.isEmpty()) {
+                    PendingMessage pendingMessage = queue.poll();
+                    Message message = new Message(getNextMessageId(topic), pendingMessage.messageText);
+                    sendMessage(topic, message.getText(), message);
+                    notifyClient(pendingMessage.clientSocket, "Il tuo messaggio è stato inviato sul topic: " + topic);
+                }
+                pendingMessages.remove(topic);
+            }
+        }
+
+        private void sendMessage(String topic, String messageText, Message message) {
+            List<Message> messages = topics.get(topic);
+            synchronized (messages) {
+                message.setId(getNextMessageId(topic));
+                messages.add(message);
+            }
+            notifySubscribers(topic, message);
+        }
+
+        private void notifySubscribers(String topic, Message message) {
+            List<Socket> subscriberSockets = subscribers.get(topic);
+            if (subscriberSockets != null) {
+                synchronized (subscriberSockets) {
+                    for (Socket subscriberSocket : subscriberSockets) {
+                        try {
+                            PrintWriter subscriberOut = new PrintWriter(subscriberSocket.getOutputStream(), true);
+                            subscriberOut.println("Nuovo messaggio su " + topic + ":");
+                            subscriberOut.println("- ID: " + message.getId());
+                            subscriberOut.println("  Testo: " + message.getText());
+                            subscriberOut.println("  Data: " + message.getTimestamp());
+                            subscriberOut.flush();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            }
+        }
+
+        private void notifyClient(Socket clientSocket, String message) {
+            try {
+                PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
+                out.println(message);
+                out.flush();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        private int getNextMessageId(String topic) {
+            synchronized (lastMessageId) {
+                int newId = lastMessageId.getOrDefault(topic, 0) + 1;
+                lastMessageId.put(topic, newId);
+                return newId;
             }
         }
     }
@@ -196,6 +273,14 @@ public class Server {
                     String command = parts[0];
                     String argument = parts.length > 1 ? parts[1] : "";
 
+                    if (topic != null && isTopicLocked(command, topic)) {
+                        out.println("Il topic " + topic + " è attualmente in fase di ispezione. Il messaggio sarà inviato alla fine della fase di ispezione.");
+                        if (command.equals("send")) {
+                            enqueueMessage(topic, argument);
+                        }
+                        continue;
+                    }
+
                     switch (command) {
                         case "publish":
                             role = "publisher";
@@ -208,6 +293,7 @@ public class Server {
                             topics.putIfAbsent(argument, new ArrayList<>());
                             publisherMessages.putIfAbsent(clientAddress, new ConcurrentHashMap<>());
                             publisherMessages.get(clientAddress).putIfAbsent(argument, new ArrayList<>());
+                            lastMessageId.putIfAbsent(argument, 0);
                             break;
                         case "subscribe":
                             role = "subscriber";
@@ -264,6 +350,17 @@ public class Server {
             }
         }
 
+        private boolean isTopicLocked(String command, String topic) {
+            if (lockedTopics.contains(topic) && (command.equals("send") || command.equals("list") || command.equals("listall"))) {
+                return true;
+            }
+            return false;
+        }
+
+        private void enqueueMessage(String topic, String messageText) {
+            pendingMessages.get(topic).add(new PendingMessage(socket, messageText));
+        }
+
         public void disconnect() {
             try {
                 if (!socket.isClosed()) {
@@ -287,10 +384,11 @@ public class Server {
                     "help: Mostra questa lista di comandi.";
         }
 
-        private void sendMessage(String topic, String message) {
+        private void sendMessage(String topic, String messageText) {
             List<Message> messages = topics.get(topic);
-            Message newMessage = new Message(messages.size() + 1, message);
+            Message newMessage = new Message(0, messageText); // ID sarà settato correttamente
             synchronized (messages) {
+                newMessage.setId(getNextMessageId(topic));
                 messages.add(newMessage);
             }
             Map<String, List<Message>> clientMessages = publisherMessages.get(clientAddress);
@@ -346,7 +444,6 @@ public class Server {
             }
         }
 
-
         private void subscribeToTopic(String topic) {
             subscribers.putIfAbsent(topic, new ArrayList<>());
             synchronized (subscribers.get(topic)) {
@@ -385,10 +482,18 @@ public class Server {
                 }
             }
         }
+
+        private int getNextMessageId(String topic) {
+            synchronized (lastMessageId) {
+                int newId = lastMessageId.getOrDefault(topic, 0) + 1;
+                lastMessageId.put(topic, newId);
+                return newId;
+            }
+        }
     }
 
     private static class Message {
-        private final int id;
+        private int id;
         private final String text;
         private final String timestamp;
 
@@ -402,12 +507,26 @@ public class Server {
             return id;
         }
 
+        public void setId(int id) {
+            this.id = id;
+        }
+
         public String getText() {
             return text;
         }
 
         public String getTimestamp() {
             return timestamp;
+        }
+    }
+
+    private static class PendingMessage {
+        private final Socket clientSocket;
+        private final String messageText;
+
+        public PendingMessage(Socket clientSocket, String messageText) {
+            this.clientSocket = clientSocket;
+            this.messageText = messageText;
         }
     }
 }
