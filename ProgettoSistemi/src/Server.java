@@ -99,6 +99,7 @@ public class Server {
             }
         }
 
+        // TODO QUANDO IL SERVER E IN MODALITA INTERATTIVA, I CLIENT NON POSSONO FARE COMANDI E QUELLI CHE FANNO, VANNO MESSI IN ATTESA FINO A CHE LA SESSIONE NON TERMINA
         private void inspectTopic(BufferedReader consoleReader, String topic) throws IOException {
             if (!topics.containsKey(topic)) {
                 System.out.println("Il topic " + topic + " non esiste.");
@@ -329,6 +330,8 @@ public class Server {
                 return;
             }
             synchronized (messages) {
+                int messageCount = messages.size();
+                out.println("Sono stati inviati " + messageCount + " messaggi in questo topic.");
                 if (messages.isEmpty()) {
                     out.println("Nessun messaggio trovato.");
                 } else {
@@ -342,6 +345,7 @@ public class Server {
                 }
             }
         }
+
 
         private void subscribeToTopic(String topic) {
             subscribers.putIfAbsent(topic, new ArrayList<>());
