@@ -530,3 +530,13 @@ public class Server {
         }
     }
 }
+
+//TODO rivedere il comando list perchè non tiene conto dei messaggi messi in attesa durante la fase di ispezione
+//TODO rivedere come vengono gestiti gli ID in generale, ma più attentamente durante la fase di ispezione ed eliminazione
+//TODO quando viene detto che non esiste un topic mettere il nome tra apici, così facciamo in modo di gestire anche i vari spazi dovuti ad errori di battitura
+//TODO controllare che il fatto che un client non possa essere publisher e subscriber dello stesso topi contemporaneamente sia corretto
+//TODO controllare perchè nella fase di ispezione sembra che un se un client è sia publisher che subscriber di un topic può comunque mandare un messaggio essendo subscriber (migliorare controllo if lock del topic)
+//TODO quando vai list sia lato server che lato client stampa il numero dei messaggi
+//TODO fare i comandi più discorsivi
+//TODO sistemare errori relativi all'interruzione improvvisa del client (errore che non si presenta su mac)
+

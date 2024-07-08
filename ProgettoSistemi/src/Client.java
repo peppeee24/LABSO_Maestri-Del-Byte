@@ -17,7 +17,7 @@ public class Client {
              BufferedReader userInput = new BufferedReader(new InputStreamReader(System.in))) {
 
             System.out.println("Connesso al server su " + SERVER_ADDRESS + ":" + SERVER_PORT);
-            System.out.println("Digita help per visualizzare tutti i comandi");
+            System.out.println("Digita 'help' per visualizzare tutti i comandi disponibili.");
             String input;
             while (true) {
                 // Controlla l'input dell'utente
@@ -27,22 +27,24 @@ public class Client {
                     out.flush(); // Assicurati che i dati siano inviati immediatamente
 
                     // Legge e stampa le risposte dal server
-                    String response;
-                    while (in.ready() && (response = in.readLine()) != null) {
-                        System.out.println("Risposta del server: " + response);
+                    while (in.ready()) {
+                        String response = in.readLine();
+                        if (response != null && !response.isEmpty()) {
+                            System.out.println(response);
+                        }
                     }
 
                     if (input.equals("quit")) {
-                        System.out.println("Disconnesso dal server.");
+                        System.out.println("Hai deciso di disconnetterti dal server. Arrivederci!");
                         break;
                     }
                 }
 
                 // Legge e stampa le risposte dal server quando non c'è input dell'utente
-                if (in.ready()) {
-                    String response;
-                    while (in.ready() && (response = in.readLine()) != null) {
-                        System.out.println("Risposta del server: " + response);
+                while (in.ready()) {
+                    String response = in.readLine();
+                    if (response != null && !response.isEmpty()) {
+                        System.out.println(response);
                     }
                 }
             }
