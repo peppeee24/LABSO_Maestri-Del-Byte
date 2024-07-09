@@ -97,6 +97,7 @@ public class Server {
 
         private void showTopics() {
             Set<String> topicList = topics.keySet();
+            System.out.println("Sono stati trovati " + topicList.size() + " topics.");
             if (topicList.isEmpty()) {
                 System.out.println("Nessun topic trovato.");
             } else {
@@ -408,6 +409,9 @@ public class Server {
                 messages = publisherMessages.get(clientAddress).get(topic);
             }
             synchronized (messages) {
+                int messageCount = messages.size();
+                out.println("Sono stati inviati " + messageCount + " messaggi in questo topic.");
+
                 if (messages.isEmpty()) {
                     out.println("Nessun messaggio trovato.");
                 } else {
@@ -535,7 +539,6 @@ public class Server {
 //TODO controllare che il fatto che un client non possa essere publisher e subscriber dello stesso topic contemporaneamente sia corretto
 //TODO quando vai list sia lato server che lato client stampa il numero dei messaggi
 //TODO fare i comandi più discorsivi
-//TODO sistemare errori relativi all'interruzione improvvisa del client (errore che non si presenta su mac)
 
 
 
