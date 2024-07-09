@@ -191,7 +191,7 @@ public class Server {
             if (queue != null) {
                 while (!queue.isEmpty()) {
                     PendingMessage pendingMessage = queue.poll();
-                    Message message = new Message(0, pendingMessage.messageText); // ID sarà settato correttamente
+                    Message message = new Message(0, pendingMessage.messageText, pendingMessage.clientSocket); // ID sarà settato correttamente
                     sendMessage(topic, message);
                     notifyClient(pendingMessage.clientSocket, "Il tuo messaggio è stato inviato sul topic: " + topic);
                 }
@@ -309,13 +309,8 @@ public class Server {
                             break;
                         case "send":
                             if ("publisher".equals(role) && !argument.isEmpty()) {
-                                if (isTopicLocked(command, topic)) {
-                                    out.println("Il topic '" + topic + "' è attualmente in fase di ispezione. Il messaggio sarà inviato alla fine della fase di ispezione.");
-                                    enqueueMessage(topic, argument);
-                                } else {
-                                    sendMessage(topic, argument);
-                                    out.println("Messaggio inviato sul topic: " + topic);
-                                }
+                                sendMessage(topic, argument);
+                                out.println("Messaggio inviato sul topic: " + topic);
                             } else if (argument.isEmpty()) {
                                 out.println("Il messaggio è vuoto, riprova");
                             } else {
@@ -348,6 +343,12 @@ public class Server {
                             return;
                         default:
                             out.println("Comando sconosciuto: " + command);
+                    }
+                    // Aggiunta di notifica dello stato corrente del client
+                    if ("publisher".equals(role)) {
+                        out.println("Stato corrente: Publisher del topic '" + topic + "'");
+                    } else if ("subscriber".equals(role)) {
+                        out.println("Stato corrente: Subscriber del topic '" + topic + "'");
                     }
                 }
             } catch (IOException e) {
@@ -393,7 +394,7 @@ public class Server {
 
         private void sendMessage(String topic, String messageText) {
             List<Message> messages = topics.get(topic);
-            Message newMessage = new Message(0, messageText); // ID sarà settato correttamente
+            Message newMessage = new Message(0, messageText, socket); // ID sarà settato correttamente
             synchronized (messages) {
                 newMessage.setId(getNextMessageId(topic));
                 messages.add(newMessage);
@@ -467,12 +468,15 @@ public class Server {
                 synchronized (subscriberSockets) {
                     for (Socket subscriberSocket : subscriberSockets) {
                         try {
-                            PrintWriter subscriberOut = new PrintWriter(subscriberSocket.getOutputStream(), true);
-                            subscriberOut.println("Nuovo messaggio su " + topic + ":");
-                            subscriberOut.println("- ID: " + message.getId());
-                            subscriberOut.println("  Testo: " + message.getText());
-                            subscriberOut.println("  Data: " + message.getTimestamp());
-                            subscriberOut.flush();
+                            // Evita di notificare il Publisher stesso
+                            if (!subscriberSocket.equals(message.getPublisherSocket())) {
+                                PrintWriter subscriberOut = new PrintWriter(subscriberSocket.getOutputStream(), true);
+                                subscriberOut.println("Nuovo messaggio su " + topic + ":");
+                                subscriberOut.println("- ID: " + message.getId());
+                                subscriberOut.println("  Testo: " + message.getText());
+                                subscriberOut.println("  Data: " + message.getTimestamp());
+                                subscriberOut.flush();
+                            }
                         } catch (IOException e) {
                             e.printStackTrace();
                         }
@@ -507,11 +511,13 @@ public class Server {
         private int id;
         private final String text;
         private final String timestamp;
+        private final Socket publisherSocket;
 
-        public Message(int id, String text) {
+        public Message(int id, String text, Socket publisherSocket) {
             this.id = id;
             this.text = text;
             this.timestamp = new SimpleDateFormat("dd/MM/yyyy - HH:mm:ss").format(new Date());
+            this.publisherSocket = publisherSocket;
         }
 
         public int getId() {
@@ -529,7 +535,12 @@ public class Server {
         public String getTimestamp() {
             return timestamp;
         }
+
+        public Socket getPublisherSocket() {
+            return publisherSocket;
+        }
     }
+
 
     private static class PendingMessage {
         private final Socket clientSocket;
@@ -542,12 +553,7 @@ public class Server {
     }
 }
 
-//TODO controllare che il fatto che un client non possa essere publisher e subscriber dello stesso topic contemporaneamente sia corretto
-//TODO quando vai list sia lato server che lato client stampa il numero dei messaggi
 //TODO fare i comandi più discorsivi
 
-
-
 //TODO rivedere il comando list perchè non tiene conto dei messaggi messi in attesa durante la fase di ispezione
-//TODO rivedere come vengono gestiti gli ID in generale, ma più attentamente durante la fase di ispezione ed eliminazione
 //TODO controllare perchè nella fase di ispezione sembra che un se un client è sia publisher che subscriber di un topic può comunque mandare un messaggio essendo subscriber (migliorare controllo if lock del topic)
