@@ -18,6 +18,8 @@ public class Client {
 
             System.out.println("Connesso al server su " + SERVER_ADDRESS + ":" + SERVER_PORT);
             System.out.println("Digita 'help' per visualizzare tutti i comandi disponibili.");
+            System.out.println("Nessun ruolo impostato attualmente.");
+
             String input;
             while (true) {
                 // Controlla l'input dell'utente
