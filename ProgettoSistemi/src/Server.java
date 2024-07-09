@@ -31,8 +31,9 @@ public class Server {
                     }
                 }
             }
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch (Exception e)
+        {
+            System.out.println("C'e stato un errore: " + e.getMessage());
         } finally {
             // Close all client connections when server shuts down
             disconnectAllClients();
@@ -108,7 +109,7 @@ public class Server {
 
         private void inspectTopic(BufferedReader consoleReader, String topic) throws IOException {
             if (!topics.containsKey(topic)) {
-                System.out.println("Il topic " + topic + " non esiste.");
+                System.out.println("Il topic '" + topic + "' non esiste.");
                 return;
             }
 
@@ -117,7 +118,7 @@ public class Server {
                 pendingMessages.putIfAbsent(topic, new LinkedList<>());
             }
 
-            System.out.println("Sessione interattiva per il topic: " + topic);
+            System.out.println("Sessione interattiva per il topic: '" + topic + "'");
             System.out.println("Comandi disponibili: :listall, :delete <id>, :end");
 
             String line;
@@ -154,7 +155,7 @@ public class Server {
         private void listAllMessages(String topic) {
             List<Message> messages = topics.get(topic);
             if (messages == null) {
-                System.out.println("Il topic " + topic + " non esiste.");
+                System.out.println("Il topic '" + topic + "' non esiste.");
                 return;
             }
             synchronized (messages) {
@@ -274,7 +275,7 @@ public class Server {
                     String argument = parts.length > 1 ? parts[1] : "";
 
                     if (topic != null && isTopicLocked(command, topic)) {
-                        out.println("Il topic " + topic + " è attualmente in fase di ispezione. Il messaggio sarà inviato alla fine della fase di ispezione.");
+                        out.println("Il topic '" + topic + "' è attualmente in fase di ispezione. Il messaggio sarà inviato alla fine della fase di ispezione.");
                         if (command.equals("send")) {
                             enqueueMessage(topic, argument);
                         }
@@ -289,7 +290,7 @@ public class Server {
                                 out.println("Devi inserire il titolo del topic");
                                 break;
                             }
-                            out.println("Publisher registrato per il topic: " + argument);
+                            out.println("Publisher registrato per il topic: '" + argument + "'");
                             topics.putIfAbsent(argument, new ArrayList<>());
                             publisherMessages.putIfAbsent(clientAddress, new ConcurrentHashMap<>());
                             publisherMessages.get(clientAddress).putIfAbsent(argument, new ArrayList<>());
@@ -302,7 +303,7 @@ public class Server {
                                 subscribeToTopic(argument);
                                 out.println("Iscritto al topic: " + argument);
                             } else {
-                                out.println("Il topic " + argument + " non esiste.");
+                                out.println("Il topic '" + argument + "' non esiste.");
                             }
                             break;
                         case "send":
@@ -424,7 +425,7 @@ public class Server {
         private void listAllMessages(PrintWriter out, String topic) {
             List<Message> messages = topics.get(topic);
             if (messages == null) {
-                out.println("Il topic " + topic + " non esiste.");
+                out.println("Il topic '" + topic + "' non esiste.");
                 return;
             }
             synchronized (messages) {
@@ -531,12 +532,19 @@ public class Server {
     }
 }
 
-//TODO rivedere il comando list perchè non tiene conto dei messaggi messi in attesa durante la fase di ispezione
-//TODO rivedere come vengono gestiti gli ID in generale, ma più attentamente durante la fase di ispezione ed eliminazione
-//TODO quando viene detto che non esiste un topic mettere il nome tra apici, così facciamo in modo di gestire anche i vari spazi dovuti ad errori di battitura
-//TODO controllare che il fatto che un client non possa essere publisher e subscriber dello stesso topi contemporaneamente sia corretto
-//TODO controllare perchè nella fase di ispezione sembra che un se un client è sia publisher che subscriber di un topic può comunque mandare un messaggio essendo subscriber (migliorare controllo if lock del topic)
+//TODO controllare che il fatto che un client non possa essere publisher e subscriber dello stesso topic contemporaneamente sia corretto
 //TODO quando vai list sia lato server che lato client stampa il numero dei messaggi
 //TODO fare i comandi più discorsivi
 //TODO sistemare errori relativi all'interruzione improvvisa del client (errore che non si presenta su mac)
+
+
+
+//TODO rivedere il comando list perchè non tiene conto dei messaggi messi in attesa durante la fase di ispezione
+//TODO rivedere come vengono gestiti gli ID in generale, ma più attentamente durante la fase di ispezione ed eliminazione
+//TODO controllare perchè nella fase di ispezione sembra che un se un client è sia publisher che subscriber di un topic può comunque mandare un messaggio essendo subscriber (migliorare controllo if lock del topic)
+
+
+
+
+
 
