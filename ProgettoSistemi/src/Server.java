@@ -31,9 +31,8 @@ public class Server {
                     }
                 }
             }
-        } catch (Exception e)
-        {
-            System.out.println("C'e stato un errore: " + e.getMessage());
+        } catch (Exception e) {
+            System.out.println("C'è stato un errore: " + e.getMessage());
         } finally {
             // Close all client connections when server shuts down
             disconnectAllClients();
@@ -192,15 +191,15 @@ public class Server {
             if (queue != null) {
                 while (!queue.isEmpty()) {
                     PendingMessage pendingMessage = queue.poll();
-                    Message message = new Message(getNextMessageId(topic), pendingMessage.messageText);
-                    sendMessage(topic, message.getText(), message);
+                    Message message = new Message(0, pendingMessage.messageText); // ID sarà settato correttamente
+                    sendMessage(topic, message);
                     notifyClient(pendingMessage.clientSocket, "Il tuo messaggio è stato inviato sul topic: " + topic);
                 }
                 pendingMessages.remove(topic);
             }
         }
 
-        private void sendMessage(String topic, String messageText, Message message) {
+        private void sendMessage(String topic, Message message) {
             List<Message> messages = topics.get(topic);
             synchronized (messages) {
                 message.setId(getNextMessageId(topic));
@@ -240,7 +239,8 @@ public class Server {
         }
 
         private int getNextMessageId(String topic) {
-            synchronized (lastMessageId) {
+            List<Message> messages = topics.get(topic);
+            synchronized (messages) {
                 int newId = lastMessageId.getOrDefault(topic, 0) + 1;
                 lastMessageId.put(topic, newId);
                 return newId;
@@ -309,8 +309,13 @@ public class Server {
                             break;
                         case "send":
                             if ("publisher".equals(role) && !argument.isEmpty()) {
-                                sendMessage(topic, argument);
-                                out.println("Messaggio inviato sul topic: " + topic);
+                                if (isTopicLocked(command, topic)) {
+                                    out.println("Il topic '" + topic + "' è attualmente in fase di ispezione. Il messaggio sarà inviato alla fine della fase di ispezione.");
+                                    enqueueMessage(topic, argument);
+                                } else {
+                                    sendMessage(topic, argument);
+                                    out.println("Messaggio inviato sul topic: " + topic);
+                                }
                             } else if (argument.isEmpty()) {
                                 out.println("Il messaggio è vuoto, riprova");
                             } else {
@@ -489,7 +494,8 @@ public class Server {
         }
 
         private int getNextMessageId(String topic) {
-            synchronized (lastMessageId) {
+            List<Message> messages = topics.get(topic);
+            synchronized (messages) {
                 int newId = lastMessageId.getOrDefault(topic, 0) + 1;
                 lastMessageId.put(topic, newId);
                 return newId;
@@ -537,13 +543,11 @@ public class Server {
 }
 
 //TODO controllare che il fatto che un client non possa essere publisher e subscriber dello stesso topic contemporaneamente sia corretto
-//TODO quando vai list sia lato server che lato client stampa il numero dei messaggi
 //TODO fare i comandi più discorsivi
 
 
 
 //TODO rivedere il comando list perchè non tiene conto dei messaggi messi in attesa durante la fase di ispezione
-//TODO rivedere come vengono gestiti gli ID in generale, ma più attentamente durante la fase di ispezione ed eliminazione
 //TODO controllare perchè nella fase di ispezione sembra che un se un client è sia publisher che subscriber di un topic può comunque mandare un messaggio essendo subscriber (migliorare controllo if lock del topic)
 
 
