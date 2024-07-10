@@ -297,10 +297,16 @@ public class Server {
                     String command = parts[0];
                     String argument = parts.length > 1 ? parts[1] : "";
 
-                    if (topic != null && isTopicLocked(command, topic)) {
-                        out.println("Il topic '" + topic + "' è attualmente in fase di ispezione. Il messaggio sarà inviato alla fine della fase di ispezione.");
+                    if (topic != null && isTopicLocked(command, topic))
+                    {
+                        out.println("Fase Ispettiva del topic '" + topic + "' in corso. Attendere il termine...");
                         if (command.equals("send") && "publisher".equals(role)) {
+                            out.println("Il topic '" + topic + "' è attualmente in fase di ispezione. Il messaggio sarà inviato alla fine della fase di ispezione.");
                             enqueueMessage(topic, argument);
+                        }
+                        else if(command.equals("send") && "subscriber".equals(role))
+                        {
+                            out.println("Il topic '" + topic + "' è attualmente in fase di ispezione.. Per inviare un messaggio devi prima registrarti come publisher utilizzando il comando 'publish <topic>'");
                         }
                         continue;
                     }
