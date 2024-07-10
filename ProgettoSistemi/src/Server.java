@@ -365,10 +365,8 @@ public class Server {
         }
 
         private boolean isTopicLocked(String command, String topic) {
-            if (lockedTopics.contains(topic) && (command.equals("send") || command.equals("list") || command.equals("listall"))) {
-                return true;
-            }
-            return false;
+            return lockedTopics.contains(topic) &&
+                    (command.equals("send") || command.equals("list") || command.equals("listall"));
         }
 
         private void enqueueMessage(String topic, String messageText) {
