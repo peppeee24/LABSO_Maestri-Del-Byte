@@ -232,15 +232,18 @@ public class Server {
             if (subscriberSockets != null) {
                 synchronized (subscriberSockets) {
                     for (Socket subscriberSocket : subscriberSockets) {
-                        try {
-                            PrintWriter subscriberOut = new PrintWriter(subscriberSocket.getOutputStream(), true);
-                            subscriberOut.println("Nuovo messaggio su " + topic + ":");
-                            subscriberOut.println("- ID: " + message.getId());
-                            subscriberOut.println("  Testo: " + message.getText());
-                            subscriberOut.println("  Data: " + message.getTimestamp());
-                            subscriberOut.flush();
-                        } catch (IOException e) {
-                            e.printStackTrace();
+                        // Evita di notificare il Publisher stesso
+                        if (!subscriberSocket.equals(message.getPublisherSocket())) {
+                            try {
+                                PrintWriter subscriberOut = new PrintWriter(subscriberSocket.getOutputStream(), true);
+                                subscriberOut.println("Nuovo messaggio su " + topic + ":");
+                                subscriberOut.println("- ID: " + message.getId());
+                                subscriberOut.println("  Testo: " + message.getText());
+                                subscriberOut.println("  Data: " + message.getTimestamp());
+                                subscriberOut.flush();
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
                         }
                     }
                 }
@@ -308,13 +311,13 @@ public class Server {
                             topic = argument;
                             if (argument.isEmpty()) {
                                 out.println("Devi inserire il titolo del topic");
-                                break;
+                            } else {
+                                out.println("Publisher registrato per il topic: '" + argument + "'");
+                                topics.putIfAbsent(argument, new ArrayList<>());
+                                publisherMessages.putIfAbsent(clientAddress, new ConcurrentHashMap<>());
+                                publisherMessages.get(clientAddress).putIfAbsent(argument, new ArrayList<>());
+                                lastMessageId.putIfAbsent(argument, 0);
                             }
-                            out.println("Publisher registrato per il topic: '" + argument + "'");
-                            topics.putIfAbsent(argument, new ArrayList<>());
-                            publisherMessages.putIfAbsent(clientAddress, new ConcurrentHashMap<>());
-                            publisherMessages.get(clientAddress).putIfAbsent(argument, new ArrayList<>());
-                            lastMessageId.putIfAbsent(argument, 0);
                             break;
                         case "subscribe":
                             role = "subscriber";
@@ -501,7 +504,6 @@ public class Server {
                 }
             }
         }
-
 
         private void showTopics(PrintWriter out) {
             Set<String> topicList = topics.keySet();
