@@ -8,7 +8,7 @@ public class Server {
     private static final int PORT = 9000;
     private static Map<String, List<Message>> topics = new ConcurrentHashMap<>();
     private static Map<String, Map<String, List<Message>>> publisherMessages = new ConcurrentHashMap<>();
-    private static Map<String, List<Socket>> subscribers = new ConcurrentHashMap<>();
+    private static Map<String, Set<Socket>> subscribers = new ConcurrentHashMap<>();
     private static List<ClientHandler> clientHandlers = new ArrayList<>();
     private static boolean isRunning = true;
     private static Set<String> lockedTopics = ConcurrentHashMap.newKeySet();
@@ -228,7 +228,7 @@ public class Server {
         }
 
         private void notifySubscribers(String topic, Message message) {
-            List<Socket> subscriberSockets = subscribers.get(topic);
+            Set<Socket> subscriberSockets = subscribers.get(topic);
             if (subscriberSockets != null) {
                 synchronized (subscriberSockets) {
                     for (Socket subscriberSocket : subscriberSockets) {
@@ -473,14 +473,14 @@ public class Server {
         }
 
         private void subscribeToTopic(String topic) {
-            subscribers.putIfAbsent(topic, new ArrayList<>());
+            subscribers.putIfAbsent(topic, ConcurrentHashMap.newKeySet());
             synchronized (subscribers.get(topic)) {
                 subscribers.get(topic).add(socket);
             }
         }
 
         private void notifySubscribers(String topic, Message message) {
-            List<Socket> subscriberSockets = subscribers.get(topic);
+            Set<Socket> subscriberSockets = subscribers.get(topic);
             if (subscriberSockets != null) {
                 synchronized (subscriberSockets) {
                     for (Socket subscriberSocket : subscriberSockets) {
@@ -501,6 +501,7 @@ public class Server {
                 }
             }
         }
+
 
         private void showTopics(PrintWriter out) {
             Set<String> topicList = topics.keySet();
