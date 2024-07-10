@@ -191,7 +191,7 @@ public class Server {
             if (queue != null) {
                 while (!queue.isEmpty()) {
                     PendingMessage pendingMessage = queue.poll();
-                    Message message = new Message(0, pendingMessage.messageText, pendingMessage.clientSocket); // ID sarà settato correttamente
+                    Message message = new Message(0, pendingMessage.messageText, pendingMessage.clientSocket);
                     sendMessage(topic, message);
                     notifyClient(pendingMessage.clientSocket, "Il tuo messaggio è stato inviato sul topic: " + topic);
                 }
@@ -205,7 +205,26 @@ public class Server {
                 message.setId(getNextMessageId(topic));
                 messages.add(message);
             }
+            // Aggiorna la lista dei messaggi del publisher
+            updatePublisherMessages(topic, message);
             notifySubscribers(topic, message);
+        }
+
+        private void updatePublisherMessages(String topic, Message message) {
+            for (ClientHandler clientHandler : clientHandlers) {
+                if (clientHandler.getSocket().equals(message.getPublisherSocket())) {
+                    Map<String, List<Message>> clientMessages = publisherMessages.get(clientHandler.getClientAddress());
+                    if (clientMessages != null) {
+                        List<Message> publisherMsgs = clientMessages.get(topic);
+                        if (publisherMsgs != null) {
+                            synchronized (publisherMsgs) {
+                                publisherMsgs.add(message);
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
         }
 
         private void notifySubscribers(String topic, Message message) {
@@ -275,16 +294,10 @@ public class Server {
                     String command = parts[0];
                     String argument = parts.length > 1 ? parts[1] : "";
 
-                    if (topic != null && isTopicLocked(command, topic))
-                    {
-                        out.println("Fase Ispettiva del topic '" + topic + "' in corso. Attendere il termine...");
+                    if (topic != null && isTopicLocked(command, topic)) {
+                        out.println("Il topic '" + topic + "' è attualmente in fase di ispezione. Il messaggio sarà inviato alla fine della fase di ispezione.");
                         if (command.equals("send") && "publisher".equals(role)) {
-                            out.println("Il topic '" + topic + "' è attualmente in fase di ispezione. Il messaggio sarà inviato alla fine della fase di ispezione.");
                             enqueueMessage(topic, argument);
-                        }
-                        else if(command.equals("send") && "subscriber".equals(role))
-                        {
-                            out.println("Il topic '" + topic + "' è attualmente in fase di ispezione.. Per inviare un messaggio devi prima registrarti come publisher utilizzando il comando 'publish <topic>'");
                         }
                         continue;
                     }
@@ -509,6 +522,14 @@ public class Server {
                 return newId;
             }
         }
+
+        public Socket getSocket() {
+            return socket;
+        }
+
+        public String getClientAddress() {
+            return clientAddress;
+        }
     }
 
     private static class Message {
@@ -545,7 +566,6 @@ public class Server {
         }
     }
 
-
     private static class PendingMessage {
         private final Socket clientSocket;
         private final String messageText;
@@ -556,8 +576,3 @@ public class Server {
         }
     }
 }
-
-//TODO fare i comandi più discorsivi
-
-//TODO rivedere il comando list perchè non tiene conto dei messaggi messi in attesa durante la fase di ispezione
-//TODO controllare perchè nella fase di ispezione sembra che un se un client è sia publisher che subscriber di un topic può comunque mandare un messaggio essendo subscriber (migliorare controllo if lock del topic)
