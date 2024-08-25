@@ -318,11 +318,14 @@ public class Server {
                             if (argument.isEmpty()) {
                                 out.println("Devi inserire il titolo del topic");
                             } else {
+                                // TODO capire come impedire la creazione di topic con lo stesso nome ma con spazi alla fine
                                 out.println("Publisher registrato per il topic: '" + argument + "'");
                                 topics.putIfAbsent(argument, new ArrayList<>());
                                 publisherMessages.putIfAbsent(clientAddress, new ConcurrentHashMap<>());
                                 publisherMessages.get(clientAddress).putIfAbsent(argument, new ArrayList<>());
                                 lastMessageId.putIfAbsent(argument, 0);
+
+
                             }
                             break;
                         case "subscribe":
@@ -407,13 +410,14 @@ public class Server {
         }
 
         private static String getHelp() {
+
             return "Comandi disponibili:\n" +
                     "publish <topic>: Registra un publisher per il topic specificato.\n" +
                     "subscribe <topic>: Iscrive il client al topic specificato.\n" +
                     "send <message>: Invia un messaggio al topic specificato.\n" +
-                    "list: Elenca tutti i messaggi per il topic specificato.\n" +
-                    "listall: Elenca tutti i messaggi per tutti i topic.\n" +
-                    "show: Mostra tutti i topic creati da tutti i client.\n" +
+                    "list: Elenca tutti i messaggi mandati dal publish corrente per il suo topic.\n" +
+                    "listall: Elenca tutti i messaggi mandati da tutti i publisher per un topic.\n" +
+                    "show: Mostra tutti i topic creati da tutti i publisher.\n" +
                     "quit: Disconnette il client dal server.\n" +
                     "help: Mostra questa lista di comandi.";
         }
