@@ -14,6 +14,7 @@ public class Server {
     private static Set<String> lockedTopics = ConcurrentHashMap.newKeySet();
     private static Map<String, Queue<PendingMessage>> pendingMessages = new ConcurrentHashMap<>();
     private static Map<String, Integer> lastMessageId = new ConcurrentHashMap<>();
+    private static Map<String, ClientHandler> usernamesInUse = new ConcurrentHashMap<>(); // Mappa degli username in uso
 
     public static void main(String[] args) {
         new CommandHandler().start();  // Start the command handler thread
@@ -167,6 +168,7 @@ public class Server {
                     System.out.println("Tutti i messaggi sul topic " + topic + ": ");
                     for (Message msg : messages) {
                         System.out.println("- ID: " + msg.getId());
+                        System.out.println("  Utente: " + msg.getPublisherUsername());
                         System.out.println("  Testo: " + msg.getText());
                         System.out.println("  Data: " + msg.getTimestamp());
                     }
@@ -191,9 +193,9 @@ public class Server {
             if (queue != null) {
                 while (!queue.isEmpty()) {
                     PendingMessage pendingMessage = queue.poll();
-                    Message message = new Message(0, pendingMessage.messageText, pendingMessage.clientSocket);
+                    Message message = new Message(0, pendingMessage.getMessageText(), pendingMessage.getUsername());
                     sendMessage(topic, message);
-                    notifyClient(pendingMessage.clientSocket, "Il tuo messaggio è stato inviato sul topic: " + topic);
+                    notifyClient(pendingMessage.getUsername(), "Il tuo messaggio è stato inviato sul topic: " + topic);
                 }
                 pendingMessages.remove(topic);
             }
@@ -211,18 +213,13 @@ public class Server {
         }
 
         private void updatePublisherMessages(String topic, Message message) {
-            for (ClientHandler clientHandler : clientHandlers) {
-                if (clientHandler.getSocket().equals(message.getPublisherSocket())) {
-                    Map<String, List<Message>> clientMessages = publisherMessages.get(clientHandler.getClientAddress());
-                    if (clientMessages != null) {
-                        List<Message> publisherMsgs = clientMessages.get(topic);
-                        if (publisherMsgs != null) {
-                            synchronized (publisherMsgs) {
-                                publisherMsgs.add(message);
-                            }
-                        }
+            Map<String, List<Message>> clientMessages = publisherMessages.get(message.getPublisherUsername());
+            if (clientMessages != null) {
+                List<Message> publisherMsgs = clientMessages.get(topic);
+                if (publisherMsgs != null) {
+                    synchronized (publisherMsgs) {
+                        publisherMsgs.add(message);
                     }
-                    break;
                 }
             }
         }
@@ -236,7 +233,7 @@ public class Server {
                         if (!subscriberSocket.equals(message.getPublisherSocket())) {
                             try {
                                 PrintWriter subscriberOut = new PrintWriter(subscriberSocket.getOutputStream(), true);
-                                subscriberOut.println("Nuovo messaggio su " + topic + ":");
+                                subscriberOut.println("Nuovo messaggio su " + topic + " da " + message.getPublisherUsername() + ":");
                                 subscriberOut.println("- ID: " + message.getId());
                                 subscriberOut.println("  Testo: " + message.getText());
                                 subscriberOut.println("  Data: " + message.getTimestamp());
@@ -250,13 +247,10 @@ public class Server {
             }
         }
 
-        private void notifyClient(Socket clientSocket, String message) {
-            try {
-                PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
-                out.println(message);
-                out.flush();
-            } catch (IOException e) {
-                e.printStackTrace();
+        private void notifyClient(String username, String message) {
+            ClientHandler clientHandler = usernamesInUse.get(username);
+            if (clientHandler != null) {
+                clientHandler.sendMessageToClient(message);
             }
         }
 
@@ -276,6 +270,7 @@ public class Server {
         private String clientAddress;
         private String role;
         private PrintWriter out;
+        private String username;
 
         public ClientHandler(Socket socket) {
             this.socket = socket;
@@ -284,28 +279,57 @@ public class Server {
         }
 
         public void run() {
-            try (BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
+            try {
+                BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
                 out = new PrintWriter(socket.getOutputStream(), true);
                 String line;
-                while ((line = in.readLine()) != null) {
-                    if (Thread.currentThread().isInterrupted()) {
-                        return;  // Exit the thread if interrupted
-                    }
 
-                    System.out.println("Comando ricevuto: " + line);
+                // Richiede l'username se non è stato già impostato
+                while (username == null && (line = in.readLine()) != null) {
                     String[] parts = line.split(" ", 2);
                     String command = parts[0];
                     String argument = parts.length > 1 ? parts[1] : "";
 
-                    if (topic != null && isTopicLocked(command, topic))
-                    {
-                        out.println("Fase Ispettiva del topic '" + topic + "' in corso. Attendere il termine...");
+                    if (command.equals("username")) {
+                        if (argument.isEmpty()) {
+                            out.println("Devi inserire un nome utente.");
+                        } else if (usernamesInUse.containsKey(argument)) {
+                            out.println("Il nome utente '" + argument + "' è già in uso. Scegli un altro nome utente.");
+                        } else {
+                            this.username = argument;
+                            usernamesInUse.put(username, this);
+                            out.println("Nome utente impostato: " + username);
+                            System.out.println("Client " + clientAddress + " ha impostato l'username: " + username);
+                            break;
+                        }
+                    } else {
+                        out.println("Devi impostare un nome utente utilizzando il comando 'username <nome>' prima di continuare.");
+                    }
+                }
+
+                if (username == null) {
+                    // Se l'username non è stato impostato, termina la connessione
+                    disconnect();
+                    return;
+                }
+
+                // Da qui in poi, l'username è impostato
+                while ((line = in.readLine()) != null) {
+                    if (Thread.currentThread().isInterrupted()) {
+                        return;  // Esci dal thread se interrotto
+                    }
+
+                    System.out.println("Comando ricevuto da " + username + ": " + line);
+                    String[] parts = line.split(" ", 2);
+                    String command = parts[0];
+                    String argument = parts.length > 1 ? parts[1] : "";
+
+                    if (topic != null && isTopicLocked(command, topic)) {
+                        out.println("Fase Ispettiva del topic '" + topic + "' in corso. Attendere il termine o riprova più tardi...");
                         if (command.equals("send") && "publisher".equals(role)) {
                             out.println("Il topic '" + topic + "' è attualmente in fase di ispezione. Il messaggio sarà inviato alla fine della fase di ispezione.");
                             enqueueMessage(topic, argument);
-                        }
-                        else if(command.equals("send") && "subscriber".equals(role))
-                        {
+                        } else if (command.equals("send") && "subscriber".equals(role)) {
                             out.println("Il topic '" + topic + "' è attualmente in fase di ispezione.. Per inviare un messaggio devi prima registrarti come publisher utilizzando il comando 'publish <topic>'");
                         }
                         continue;
@@ -318,14 +342,11 @@ public class Server {
                             if (argument.isEmpty()) {
                                 out.println("Devi inserire il titolo del topic");
                             } else {
-                                // TODO capire come impedire la creazione di topic con lo stesso nome ma con spazi alla fine
                                 out.println("Publisher registrato per il topic: '" + argument + "'");
                                 topics.putIfAbsent(argument, new ArrayList<>());
-                                publisherMessages.putIfAbsent(clientAddress, new ConcurrentHashMap<>());
-                                publisherMessages.get(clientAddress).putIfAbsent(argument, new ArrayList<>());
+                                publisherMessages.putIfAbsent(username, new ConcurrentHashMap<>());
+                                publisherMessages.get(username).putIfAbsent(argument, new ArrayList<>());
                                 lastMessageId.putIfAbsent(argument, 0);
-
-
                             }
                             break;
                         case "subscribe":
@@ -386,6 +407,8 @@ public class Server {
                 if (isRunning) {
                     e.printStackTrace();
                 }
+            } finally {
+                disconnect(); // Assicurati di disconnettere e rimuovere l'username
             }
         }
 
@@ -395,11 +418,14 @@ public class Server {
         }
 
         private void enqueueMessage(String topic, String messageText) {
-            pendingMessages.get(topic).add(new PendingMessage(socket, messageText));
+            pendingMessages.get(topic).add(new PendingMessage(username, messageText));
         }
 
         public void disconnect() {
             try {
+                if (username != null) {
+                    usernamesInUse.remove(username);
+                }
                 if (!socket.isClosed()) {
                     out.println("Il server ha terminato la connessione");
                     socket.close();
@@ -424,12 +450,12 @@ public class Server {
 
         private void sendMessage(String topic, String messageText) {
             List<Message> messages = topics.get(topic);
-            Message newMessage = new Message(0, messageText, socket); // ID sarà settato correttamente
+            Message newMessage = new Message(0, messageText, username); // ID sarà settato correttamente
             synchronized (messages) {
                 newMessage.setId(getNextMessageId(topic));
                 messages.add(newMessage);
             }
-            Map<String, List<Message>> clientMessages = publisherMessages.get(clientAddress);
+            Map<String, List<Message>> clientMessages = publisherMessages.get(username);
             List<Message> publisherMsgs = clientMessages.get(topic);
             synchronized (publisherMsgs) {
                 publisherMsgs.add(newMessage);
@@ -442,7 +468,7 @@ public class Server {
             if (includeAll) {
                 messages = topics.get(topic);
             } else {
-                messages = publisherMessages.get(clientAddress).get(topic);
+                messages = publisherMessages.get(username).get(topic);
             }
             synchronized (messages) {
                 int messageCount = messages.size();
@@ -454,6 +480,7 @@ public class Server {
                     out.println("Messaggi:");
                     for (Message msg : messages) {
                         out.println("- ID: " + msg.getId());
+                        out.println("  Utente: " + msg.getPublisherUsername());
                         out.println("  Testo: " + msg.getText());
                         out.println("  Data: " + msg.getTimestamp());
                     }
@@ -477,6 +504,7 @@ public class Server {
                     out.println("Tutti i messaggi sul topic " + topic + ": ");
                     for (Message msg : messages) {
                         out.println("- ID: " + msg.getId());
+                        out.println("  Utente: " + msg.getPublisherUsername());
                         out.println("  Testo: " + msg.getText());
                         out.println("  Data: " + msg.getTimestamp());
                     }
@@ -499,9 +527,9 @@ public class Server {
                     for (Socket subscriberSocket : subscriberSockets) {
                         try {
                             // Evita di notificare il Publisher stesso
-                            if (!subscriberSocket.equals(message.getPublisherSocket())) {
+                            if (!subscriberSocket.equals(socket)) {
                                 PrintWriter subscriberOut = new PrintWriter(subscriberSocket.getOutputStream(), true);
-                                subscriberOut.println("Nuovo messaggio su " + topic + ":");
+                                subscriberOut.println("Nuovo messaggio su " + topic + " da " + message.getPublisherUsername() + ":");
                                 subscriberOut.println("- ID: " + message.getId());
                                 subscriberOut.println("  Testo: " + message.getText());
                                 subscriberOut.println("  Data: " + message.getTimestamp());
@@ -536,6 +564,11 @@ public class Server {
             }
         }
 
+        public void sendMessageToClient(String message) {
+            out.println(message);
+            out.flush();
+        }
+
         public Socket getSocket() {
             return socket;
         }
@@ -543,19 +576,23 @@ public class Server {
         public String getClientAddress() {
             return clientAddress;
         }
+
+        public String getUsername() {
+            return username;
+        }
     }
 
     private static class Message {
         private int id;
         private final String text;
         private final String timestamp;
-        private final Socket publisherSocket;
+        private final String publisherUsername;
 
-        public Message(int id, String text, Socket publisherSocket) {
+        public Message(int id, String text, String publisherUsername) {
             this.id = id;
             this.text = text;
             this.timestamp = new SimpleDateFormat("dd/MM/yyyy - HH:mm:ss").format(new Date());
-            this.publisherSocket = publisherSocket;
+            this.publisherUsername = publisherUsername;
         }
 
         public int getId() {
@@ -574,18 +611,31 @@ public class Server {
             return timestamp;
         }
 
+        public String getPublisherUsername() {
+            return publisherUsername;
+        }
+
         public Socket getPublisherSocket() {
-            return publisherSocket;
+            ClientHandler clientHandler = usernamesInUse.get(publisherUsername);
+            return clientHandler != null ? clientHandler.getSocket() : null;
         }
     }
 
     private static class PendingMessage {
-        private final Socket clientSocket;
+        private final String username;
         private final String messageText;
 
-        public PendingMessage(Socket clientSocket, String messageText) {
-            this.clientSocket = clientSocket;
+        public PendingMessage(String username, String messageText) {
+            this.username = username;
             this.messageText = messageText;
+        }
+
+        public String getUsername() {
+            return username;
+        }
+
+        public String getMessageText() {
+            return messageText;
         }
     }
 }
