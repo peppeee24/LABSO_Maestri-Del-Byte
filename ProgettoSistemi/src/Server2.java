@@ -4,7 +4,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.*;
 
-public class Server {
+public class Server2 {
     private static final int PORT = 9000;
     private static Map<String, List<Message>> topics = new ConcurrentHashMap<>();
     private static Map<String, Map<String, List<Message>>> publisherMessages = new ConcurrentHashMap<>();

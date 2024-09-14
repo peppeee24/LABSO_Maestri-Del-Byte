@@ -1,7 +1,7 @@
 import java.io.*;
 import java.net.*;
 
-public class Client {
+public class Client1 {
     private static String SERVER_ADDRESS = "127.0.0.1";
     private static int SERVER_PORT = 9000;
 
