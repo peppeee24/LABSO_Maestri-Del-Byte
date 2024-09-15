@@ -1,6 +1,5 @@
 package Server;
 
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -9,15 +8,17 @@ import java.net.Socket;
 import java.util.*;
 
 public class CommandHandler extends Thread {
-    private Server server;
+    private Server server; // Riferimento al server principale
+
 
     public CommandHandler(Server server) {
         this.server = server;
     }
-
+    // Gestisce i comandi del Server
     public void run() {
         try (BufferedReader consoleReader = new BufferedReader(new InputStreamReader(System.in))) {
             String command;
+            // Legge i comandi dalla console del server
             while ((command = consoleReader.readLine()) != null) {
                 String[] parts = command.split(" ", 2);
                 String mainCommand = parts[0];
@@ -54,6 +55,7 @@ public class CommandHandler extends Thread {
         }
     }
 
+    // Mostra i comandi amministrativi disponibili
     private void showAdminCommands() {
         System.out.println("Comandi amministrativi disponibili:");
         System.out.println("quit: disconnette tutti i client");
@@ -61,6 +63,7 @@ public class CommandHandler extends Thread {
         System.out.println("inspect <topic>: apre una sessione interattiva per analizzare un topic");
     }
 
+    // Mostra la lista di tutti i topic
     private void showTopics() {
         Set<String> topicList = ServerState.topics.keySet();
         System.out.println("Sono stati trovati " + topicList.size() + " topics.");
@@ -74,6 +77,7 @@ public class CommandHandler extends Thread {
         }
     }
 
+    // Inizia una sessione interattiva per ispezionare un topic
     private void inspectTopic(BufferedReader consoleReader, String topic) throws IOException {
         if (!ServerState.topics.containsKey(topic)) {
             System.out.println("Il topic '" + topic + "' non esiste.");
@@ -119,6 +123,7 @@ public class CommandHandler extends Thread {
         }
     }
 
+    // Elenca tutti i messaggi di un topic
     private void listAllMessages(String topic) {
         List<Message> messages = ServerState.topics.get(topic);
         if (messages == null) {
@@ -142,6 +147,7 @@ public class CommandHandler extends Thread {
         }
     }
 
+    // Elimina un messaggio dal topic specificato
     private void deleteMessage(String topic, int id) {
         List<Message> messages = ServerState.topics.get(topic);
         synchronized (messages) {
@@ -154,6 +160,7 @@ public class CommandHandler extends Thread {
         }
     }
 
+    // Processa i messaggi in attesa dopo la fase di ispezione
     private void processPendingMessages(String topic) {
         Queue<PendingMessage> queue = ServerState.pendingMessages.get(topic);
         if (queue != null) {
@@ -167,6 +174,7 @@ public class CommandHandler extends Thread {
         }
     }
 
+    // Invia un messaggio al topic e notifica i subscribers
     private void sendMessage(String topic, Message message) {
         List<Message> messages = ServerState.topics.get(topic);
         synchronized (messages) {
@@ -175,9 +183,11 @@ public class CommandHandler extends Thread {
         }
         // Aggiorna la lista dei messaggi del publisher
         updatePublisherMessages(topic, message);
+        // Notifica i subscribers del topic
         notifySubscribers(topic, message);
     }
 
+    // Aggiorna la lista dei messaggi per il publisher
     private void updatePublisherMessages(String topic, Message message) {
         Map<String, List<Message>> clientMessages = ServerState.publisherMessages.get(message.getPublisherUsername());
         if (clientMessages != null) {
@@ -190,6 +200,7 @@ public class CommandHandler extends Thread {
         }
     }
 
+    // Notifica tutti i subscribers del topic di un nuovo messaggio
     private void notifySubscribers(String topic, Message message) {
         Set<Socket> subscriberSockets = ServerState.subscribers.get(topic);
         if (subscriberSockets != null) {
@@ -213,6 +224,7 @@ public class CommandHandler extends Thread {
         }
     }
 
+    // Notifica un client specifico con un messaggio
     private void notifyClient(String username, String message) {
         ClientHandler clientHandler = ServerState.usernamesInUse.get(username);
         if (clientHandler != null) {
@@ -220,6 +232,7 @@ public class CommandHandler extends Thread {
         }
     }
 
+    // Genera un nuovo ID per un messaggio nel topic specificato
     private int getNextMessageId(String topic) {
         List<Message> messages = ServerState.topics.get(topic);
         synchronized (messages) {

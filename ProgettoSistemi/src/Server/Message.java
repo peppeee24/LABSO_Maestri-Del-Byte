@@ -1,15 +1,14 @@
 package Server;
 
-
 import java.net.Socket;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
 public class Message {
-    private int id;
-    private final String text;
-    private final String timestamp;
-    private final String publisherUsername;
+    private int id; // ID univoco del messaggio
+    private final String text; // Testo del messaggio
+    private final String timestamp; // Timestamp del messaggio
+    private final String publisherUsername; // Username del publisher che ha inviato il messaggio
 
     public Message(int id, String text, String publisherUsername) {
         this.id = id;
@@ -18,6 +17,7 @@ public class Message {
         this.publisherUsername = publisherUsername;
     }
 
+    // Getter e setter per gli attributi
     public int getId() {
         return id;
     }
@@ -38,6 +38,7 @@ public class Message {
         return publisherUsername;
     }
 
+    // Ottiene il socket del publisher utilizzando l'username
     public Socket getPublisherSocket() {
         ClientHandler clientHandler = ServerState.usernamesInUse.get(publisherUsername);
         return clientHandler != null ? clientHandler.getSocket() : null;

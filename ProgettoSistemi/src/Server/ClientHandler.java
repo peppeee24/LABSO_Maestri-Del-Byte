@@ -1,6 +1,5 @@
 package Server;
 
-
 import java.io.*;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -10,13 +9,13 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class ClientHandler extends Thread {
-    private Socket socket;
-    private Server server;
-    private String topic;
-    private String clientAddress;
-    private String role;
-    private PrintWriter out;
-    private String username;
+    private Socket socket; // Socket per la comunicazione con il client
+    private Server server; // Riferimento al server principale
+    private String topic; // Topic a cui il client è associato
+    private String clientAddress; // Indirizzo del client
+    private String role; // Ruolo del client (publisher o subscriber)
+    private PrintWriter out; // Flusso di output verso il client
+    private String username; // Username del client
 
     public ClientHandler(Socket socket, Server server) {
         this.socket = socket;
@@ -25,6 +24,7 @@ public class ClientHandler extends Thread {
         System.out.println("Nuovo client connesso: " + clientAddress);
     }
 
+// Gestisce i comandi del client
     public void run() {
         try {
             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -47,7 +47,7 @@ public class ClientHandler extends Thread {
                         ServerState.usernamesInUse.put(username, this);
                         out.println("Nome utente impostato: " + username);
                         System.out.println("Client " + clientAddress + " ha impostato l'username: " + username);
-                        break;
+                        break; // Esce dal loop dopo aver impostato l'username
                     }
                 } else {
                     out.println("Devi impostare un nome utente utilizzando il comando 'username <nome>' prima di continuare.");
@@ -63,7 +63,7 @@ public class ClientHandler extends Thread {
             // Da qui in poi, l'username è impostato
             while ((line = in.readLine()) != null) {
                 if (Thread.currentThread().isInterrupted()) {
-                    return;  // Esci dal thread se interrotto
+                    return; // Esci dal thread se interrotto
                 }
 
                 System.out.println("Comando ricevuto da " + username + ": " + line);
@@ -71,13 +71,14 @@ public class ClientHandler extends Thread {
                 String command = parts[0];
                 String argument = parts.length > 1 ? parts[1] : "";
 
+                // Controlla se il topic è bloccato (in fase di ispezione)
                 if (topic != null && isTopicLocked(command, topic)) {
                     out.println("Fase Ispettiva del topic '" + topic + "' in corso. Attendere il termine o riprova più tardi...");
                     if (command.equals("send") && "publisher".equals(role)) {
                         out.println("Il topic '" + topic + "' è attualmente in fase di ispezione. Il messaggio sarà inviato alla fine della fase di ispezione.");
                         enqueueMessage(topic, argument);
                     } else if (command.equals("send") && "subscriber".equals(role)) {
-                        out.println("Il topic '" + topic + "' è attualmente in fase di ispezione.. Per inviare un messaggio devi prima registrarti come publisher utilizzando il comando 'publish <topic>'");
+                        out.println("Il topic '" + topic + "' è attualmente in fase di ispezione. Per inviare un messaggio devi prima registrarti come publisher utilizzando il comando 'publish <topic>'");
                     }
                     continue;
                 }
@@ -90,6 +91,7 @@ public class ClientHandler extends Thread {
                             out.println("Devi inserire il titolo del topic");
                         } else {
                             out.println("Publisher registrato per il topic: '" + argument + "'");
+                            // Crea il topic se non esiste e inizializza le strutture dati
                             ServerState.topics.putIfAbsent(argument, new ArrayList<>());
                             ServerState.publisherMessages.putIfAbsent(username, new ConcurrentHashMap<>());
                             ServerState.publisherMessages.get(username).putIfAbsent(argument, new ArrayList<>());
@@ -137,7 +139,7 @@ public class ClientHandler extends Thread {
                         showTopics(out);
                         break;
                     case "quit":
-                        out.println("Arrivederci!");
+                        //out.println("Arrivederci!");
                         disconnect();
                         return;
                     default:
@@ -159,15 +161,18 @@ public class ClientHandler extends Thread {
         }
     }
 
+    // Verifica se il topic è bloccato per operazioni di ispezione
     private boolean isTopicLocked(String command, String topic) {
         return ServerState.lockedTopics.contains(topic) &&
                 (command.equals("send") || command.equals("list") || command.equals("listall"));
     }
 
+    // Aggiunge un messaggio alla coda dei messaggi in attesa per il topic
     private void enqueueMessage(String topic, String messageText) {
         ServerState.pendingMessages.get(topic).add(new PendingMessage(username, messageText));
     }
 
+    // Metodo per disconnettere il client
     public void disconnect() {
         try {
             if (username != null) {
@@ -182,34 +187,46 @@ public class ClientHandler extends Thread {
         }
     }
 
+    // Fornisce la lista dei comandi disponibili al client
     private static String getHelp() {
 
         return "Comandi disponibili:\n" +
                 "publish <topic>: Registra un publisher per il topic specificato.\n" +
                 "subscribe <topic>: Iscrive il client al topic specificato.\n" +
                 "send <message>: Invia un messaggio al topic specificato.\n" +
-                "list: Elenca tutti i messaggi mandati dal publish corrente per il suo topic.\n" +
+                "list: Elenca tutti i messaggi mandati dal publisher corrente per il suo topic.\n" +
                 "listall: Elenca tutti i messaggi mandati da tutti i publisher per un topic.\n" +
                 "show: Mostra tutti i topic creati da tutti i publisher.\n" +
                 "quit: Disconnette il client dal server.\n" +
                 "help: Mostra questa lista di comandi.";
     }
 
+    // Invia un messaggio al topic e notifica i subscribers
     private void sendMessage(String topic, String messageText) {
         List<Message> messages = ServerState.topics.get(topic);
-        Message newMessage = new Message(0, messageText, username); // ID sarà settato correttamente
+        Message newMessage = new Message(0, messageText, username); // ID sarà impostato successivamente
+
+
+        // Controlla l'accesso concorrente gestendo la sincronizzazione
+        // Nel caso ad esempio due pubblisher dello stesso topic inviino un messaggio allo stesso momento
+        // Solo un thread alla volta può esegire il codice all'interno del blocco synchronized
+        // Nessun altro thread può accederci finchè quello in corso non ha finito
+
         synchronized (messages) {
             newMessage.setId(getNextMessageId(topic));
             messages.add(newMessage);
         }
+        // Aggiorna la lista dei messaggi del publisher
         Map<String, List<Message>> clientMessages = ServerState.publisherMessages.get(username);
         List<Message> publisherMsgs = clientMessages.get(topic);
         synchronized (publisherMsgs) {
             publisherMsgs.add(newMessage);
         }
+        // Notifica i subscribers del topic
         notifySubscribers(topic, newMessage);
     }
 
+    // Elenca i messaggi del topic, può includere solo quelli del publisher corrente o tutti
     private void listMessages(PrintWriter out, String topic, boolean includeAll) {
         List<Message> messages;
         if (includeAll) {
@@ -236,6 +253,7 @@ public class ClientHandler extends Thread {
         }
     }
 
+    // Registra il client come subscriber al topic specificato
     private void subscribeToTopic(String topic) {
         ServerState.subscribers.putIfAbsent(topic, ConcurrentHashMap.newKeySet());
         synchronized (ServerState.subscribers.get(topic)) {
@@ -243,6 +261,7 @@ public class ClientHandler extends Thread {
         }
     }
 
+    // Notifica tutti i subscribers del topic di un nuovo messaggio
     private void notifySubscribers(String topic, Message message) {
         Set<Socket> subscriberSockets = ServerState.subscribers.get(topic);
         if (subscriberSockets != null) {
@@ -266,6 +285,7 @@ public class ClientHandler extends Thread {
         }
     }
 
+    // Mostra la lista di tutti i topic disponibili
     private void showTopics(PrintWriter out) {
         Set<String> topicList = ServerState.topics.keySet();
         if (topicList.isEmpty()) {
@@ -278,6 +298,7 @@ public class ClientHandler extends Thread {
         }
     }
 
+    // Genera un nuovo ID per un messaggio nel topic specificato
     private int getNextMessageId(String topic) {
         List<Message> messages = ServerState.topics.get(topic);
         synchronized (messages) {
@@ -287,19 +308,23 @@ public class ClientHandler extends Thread {
         }
     }
 
+    // Invia un messaggio al client
     public void sendMessageToClient(String message) {
         out.println(message);
         out.flush();
     }
 
+    // Getter per il socket del client
     public Socket getSocket() {
         return socket;
     }
 
+    // Getter per l'indirizzo del client
     public String getClientAddress() {
         return clientAddress;
     }
 
+    // Getter per l'username del client
     public String getUsername() {
         return username;
     }

@@ -4,14 +4,15 @@ import java.io.*;
 import java.net.Socket;
 
 public class ClientConnection {
-    private String serverAddress = "127.0.0.1";
-    private int serverPort = 9000;
+    private String serverAddress = "127.0.0.1"; // Indirizzo IP del server (localhost di default)
+    private int serverPort = 9000; // Porta su cui il server è in ascolto
 
-    private Socket socket;
-    private BufferedReader in;
-    private PrintWriter out;
-    private BufferedReader userInput;
+    private Socket socket; // Socket per la connessione al server
+    private BufferedReader in; // Flusso di input dal server
+    private PrintWriter out; // Flusso di output verso il server
+    private BufferedReader userInput; // Flusso di input dall'utente (console)
 
+    // Costruttore che accetta argomenti per impostare indirizzo e porta del server
     public ClientConnection(String[] args) {
         if (args.length == 2) {
             serverAddress = args[0];
@@ -19,24 +20,31 @@ public class ClientConnection {
         }
     }
 
+    // Metodo principale per avviare la connessione e gestire l'interazione con il server
     public void start() {
         try {
+            // Creazione del socket per connettersi al server
             socket = new Socket(serverAddress, serverPort);
+            // Inizializzazione dei flussi di input e output
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             out = new PrintWriter(socket.getOutputStream(), true);
             userInput = new BufferedReader(new InputStreamReader(System.in));
 
+            // Autenticazione dell'utente (impostazione dell'username)
             authenticate();
 
             System.out.println("Connesso al server su " + serverAddress + ":" + serverPort);
             System.out.println("Digita 'help' per visualizzare tutti i comandi disponibili.");
             System.out.println("Nessun ruolo impostato attualmente.");
 
+            // Avvio di un thread per ascoltare i messaggi dal server
             ServerListener serverListener = new ServerListener(in);
             serverListener.start();
 
+            // Gestione dell'input dell'utente dalla console
             handleUserInput();
 
+            // Interrompe il thread di ascolto e chiude la connessione
             serverListener.interrupt();
             socket.close();
 
@@ -45,12 +53,13 @@ public class ClientConnection {
         }
     }
 
+    // Metodo per autenticare l'utente impostando l'username
     private void authenticate() throws IOException {
         String username;
         while (true) {
             System.out.print("Inserisci il tuo nome utente: ");
             username = userInput.readLine();
-            out.println("username " + username);  // Invia il nome utente al server
+            out.println("username " + username); // Invia il comando 'username' al server
             out.flush();
 
             // Legge la risposta dal server
@@ -58,7 +67,7 @@ public class ClientConnection {
             if (response != null) {
                 System.out.println(response);
                 if (response.startsWith("Nome utente impostato")) {
-                    break;  // Username accettato dal server
+                    break; // Username accettato dal server, esce dal loop
                 } else if (response.startsWith("Il nome utente")) {
                     // Username già in uso, riprova
                     continue;
@@ -66,7 +75,7 @@ public class ClientConnection {
                     // Nessun username inserito, riprova
                     continue;
                 } else {
-                    // Altra risposta, termina
+                    // Altra risposta, termina la connessione
                     System.out.println("Connessione terminata dal server.");
                     return;
                 }
@@ -77,6 +86,7 @@ public class ClientConnection {
         }
     }
 
+    // Metodo per gestire l'input dell'utente dalla console
     private void handleUserInput() throws IOException {
         String input;
         while (true) {
@@ -84,14 +94,14 @@ public class ClientConnection {
             System.out.print("> ");
             input = userInput.readLine();
             if (input == null) {
-                break; // Fine dell'input
+                break; // Fine dell'input (EOF)
             }
-            out.println(input);
+            out.println(input); // Invia il comando al server
             out.flush(); // Assicura che i dati siano inviati immediatamente
 
             if (input.equals("quit")) {
                 System.out.println("Hai deciso di disconnetterti dal server. Arrivederci!");
-                break;
+                break; // Esce dal loop se l'utente decide di disconnettersi
             }
         }
     }
