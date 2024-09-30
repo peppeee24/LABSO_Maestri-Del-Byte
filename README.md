@@ -122,8 +122,8 @@ __1.1.3 Interazione tra Componenti_
 
 _1.1.4 Rappresentazione Grafica_
 
-![img.png](img.png)
-![img_1.png](img_1.png)
+![img.png](images/img.png)
+![img_1.png](images/img_1.png)
 
 ---
 
@@ -477,7 +477,7 @@ Essendo un progetto a scopo didattico, l'esecuzione è pensata per avvenire in l
 
 Prima di tutto, è necessario avviare il server con i seguenti comandi:
 
-![img_2.png](img_2.png)
+![img_2.png](images/img_2.png)
 
 Assicurarsi di eseguire i comandi nella cartella che contiene la cartella **Server** e non direttamente dentro **Server**.  
 Se il percorso non viene incluso correttamente, si verificherà un errore.  
@@ -489,7 +489,7 @@ Il server si metterà in ascolto sulla porta predefinita **9000**, come indicato
 
 Dopo che il server è in ascolto, è possibile avviare il client utilizzando un comando simile:
 
-![img_3.png](img_3.png)
+![img_3.png](images/img_3.png)
 
 Anche in questo caso, è fondamentale eseguire il comando nella cartella che contiene la cartella **Client** e non all'interno di **Client**.  
 Se il percorso non viene specificato correttamente, il terminale restituirà un errore.  
@@ -501,35 +501,35 @@ Se il percorso non viene specificato correttamente, il terminale restituirà un 
 
 NB: I dettagli di ogni comando sono descritti nella parte [1.2](#1.2-descrizione-dettagliata-delle-singole-componenti).
 
-![img_4.png](img_4.png)
+![img_4.png](images/img_4.png)
 Figura 1: Il comando help fornisce un elenco di tutti i comandi disponibili per il client.
 
 
-![img_5.png](img_5.png)  
+![img_5.png](images/img_5.png)  
 Figura 2: Il client si registra come publisher per un determinato topic.
 
 
-![img_6.png](img_6.png)  
+![img_6.png](images/img_6.png)  
 Figura 3: Il publisher invia un messaggio al server sul topic selezionato.
 
 
-![img_7.png](img_7.png)  
+![img_7.png](images/img_7.png)  
 Figura 4: Il client esce e si disconnette dal server.
 
 
-![img_8.png](img_8.png)  
+![img_8.png](images/img_8.png)  
 Figura 5: Il client si iscrive a un topic per ricevere messaggi pubblicati su quel topic.
 
 
-![img_9.png](img_9.png)  
+![img_9.png](images/img_9.png)  
 Figura 6: Mostra una lista di tutti i topic creati e disponibili sul server.
 
 
-![img_10.png](img_10.png)  
+![img_10.png](images/img_10.png)  
 Figura 7: Mostra la lista dei messaggi inviati dal publisher.
 
 
-![img_11.png](img_11.png)
+![img_11.png](images/img_11.png)
 
 Figura 8: Mostra la lista completa di tutti i messaggi inviati su un topic.
 
@@ -538,37 +538,37 @@ Figura 8: Mostra la lista completa di tutti i messaggi inviati su un topic.
 
 #### 3.2.2 Esempi di comandi per il Server
 
-![img_12.png](img_12.png) 
+![img_12.png](images/img_12.png) 
 
 Figura 9: L'immagine mostra una serie di comandi eseguiti dal client e ricevuti dal server. Si tratta di una sessione completa di interazioni, che include la pubblicazione, sottoscrizione e invio di messaggi su un topic, insieme all'elenco dei messaggi pubblicati
 
 
-![img_13.png](img_13.png)  
+![img_13.png](images/img_13.png)  
 Figura 10: Mostra la lista completa di tutti i messaggi inviati su un topic.
 
 
-![img_14.png](img_14.png)  
+![img_14.png](images/img_14.png)  
 Figura 11: Permette l'ispezione di un topic specifico e la possibilità di cancellare messaggi o visualizzarli.
 
 
-![img_15.png](img_15.png) 
+![img_15.png](images/img_15.png) 
 
 Figura 12: Il comando chiude il server e disconnette tutti i client attivi.
  
 
-![img_16.png](img_16.png)  
+![img_16.png](images/img_16.png)  
 Figura 13: Mostra i comandi amministrativi disponibili per la gestione del server.
 
 
-![img_17.png](img_17.png)  
+![img_17.png](images/img_17.png)  
 Figura 14: Mostra una lista di tutti i topic creati e disponibili sul server.
 
 
-![img_20.png](img_20.png)  
+![img_20.png](images/img_20.png)  
 Figura 15: Cancella il messaggio con ID 2 dal topic corrente durante la fase di ispezione.
 
 
-![img_19.png](img_19.png)
+![img_19.png](images/img_19.png)
 
 Figura 16: Termina la sessione di ispezione di un topic e riprende l'invio dei messaggi in coda.
 
