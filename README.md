@@ -205,7 +205,6 @@ La classe `ClientHandler` estende `Thread` e gestisce la comunicazione tra il se
 - `sendMessageToClient(String message)`: Invia un messaggio diretto al client.
 
 ---
----
 
 ### Classe `CommandHandler`
 
@@ -290,7 +289,6 @@ La classe `PendingMessage` rappresenta un messaggio che è stato inviato mentre 
 - `getUsername()`: Restituisce l’username del client.
 - `getMessageText()`: Restituisce il contenuto testuale del messaggio.
 
----
 
 ---
 
@@ -532,7 +530,9 @@ Figura 7: Mostra la lista dei messaggi inviati dal publisher.
 
 
 ![img_11.png](img_11.png)
+
 Figura 8: Mostra la lista completa di tutti i messaggi inviati su un topic.
+
 
 ---
 
@@ -541,6 +541,7 @@ Figura 8: Mostra la lista completa di tutti i messaggi inviati su un topic.
 ![img_12.png](img_12.png) 
 
 Figura 9: L'immagine mostra una serie di comandi eseguiti dal client e ricevuti dal server. Si tratta di una sessione completa di interazioni, che include la pubblicazione, sottoscrizione e invio di messaggi su un topic, insieme all'elenco dei messaggi pubblicati
+
 
 ![img_13.png](img_13.png)  
 Figura 10: Mostra la lista completa di tutti i messaggi inviati su un topic.
@@ -551,6 +552,7 @@ Figura 11: Permette l'ispezione di un topic specifico e la possibilità di cance
 
 
 ![img_15.png](img_15.png) 
+
 Figura 12: Il comando chiude il server e disconnette tutti i client attivi.
  
 
@@ -567,7 +569,9 @@ Figura 15: Cancella il messaggio con ID 2 dal topic corrente durante la fase di 
 
 
 ![img_19.png](img_19.png)
+
 Figura 16: Termina la sessione di ispezione di un topic e riprende l'invio dei messaggi in coda.
+
 
 ---
 
