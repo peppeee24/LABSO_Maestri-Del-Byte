@@ -12,7 +12,7 @@
 
 * 	Cozza Giuseppe: 0001077442
 
-* 	Magli Simone: 0001077442
+* 	Magli Simone: 0001069295
 
 * 	Sgambelluri Federico: 0001068826
 
