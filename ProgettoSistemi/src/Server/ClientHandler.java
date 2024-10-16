@@ -263,7 +263,7 @@ public class ClientHandler extends Thread {
 
      */
     /*Sincronizza l'intero metodo su ServerState.subscribers o una parte dell'operazione.
-    In questo caso, stai sincronizzando l'accesso sia a putIfAbsent che all'operazione successiva.
+    In questo caso, sincronizziamo l'accesso sia a putIfAbsent che all'operazione successiva.
     Ora l'intera operazione è atomica e non ci saranno interferenze tra i thread.
     Il lock viene acquisito una sola volta su ServerState.subscribers,
     garantendo che solo un thread alla volta esegua sia il controllo che l'azione.*/
