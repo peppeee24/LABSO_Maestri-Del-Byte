@@ -209,7 +209,7 @@ public class ClientHandler extends Thread {
 
         // Controlla l'accesso concorrente gestendo la sincronizzazione
         // Nel caso ad esempio due pubblisher dello stesso topic inviino un messaggio allo stesso momento
-        // Solo un thread alla volta può esegire il codice all'interno del blocco synchronized
+        // Solo un thread alla volta può eseguire il codice all'interno del blocco synchronized
         // Nessun altro thread può accederci finchè quello in corso non ha finito
 
         synchronized (messages) {
@@ -254,12 +254,26 @@ public class ClientHandler extends Thread {
     }
 
     // Registra il client come subscriber al topic specificato
-    private void subscribeToTopic(String topic) {
+    /*private void subscribeToTopic(String topic) {
         ServerState.subscribers.putIfAbsent(topic, ConcurrentHashMap.newKeySet());
         synchronized (ServerState.subscribers.get(topic)) {
             ServerState.subscribers.get(topic).add(socket);
         }
     }
+
+     */
+    /*Sincronizza l'intero metodo su ServerState.subscribers o una parte dell'operazione.
+    In questo caso, stai sincronizzando l'accesso sia a putIfAbsent che all'operazione successiva.
+    Ora l'intera operazione è atomica e non ci saranno interferenze tra i thread.
+    Il lock viene acquisito una sola volta su ServerState.subscribers,
+    garantendo che solo un thread alla volta esegua sia il controllo che l'azione.*/
+    private void subscribeToTopic(String topic) {
+        synchronized (ServerState.subscribers) {
+            ServerState.subscribers.putIfAbsent(topic, ConcurrentHashMap.newKeySet());
+            ServerState.subscribers.get(topic).add(socket);
+        }
+    }
+
 
     // Notifica tutti i subscribers del topic di un nuovo messaggio
     private void notifySubscribers(String topic, Message message) {
