@@ -24,8 +24,12 @@ public class CommandHandler extends Thread {
                 String mainCommand = parts[0];
                 String argument = parts.length > 1 ? parts[1] : "";
 
-                synchronized (ServerState.lockedTopics) {
-                    if (ServerState.lockedTopics.isEmpty()) {
+                //  Controlliamo che sia eseguita in maniera sicura in un contesto multi-thread
+                // synchronized blocca ServerState.lockedTopics in modo che solo un thread alla volta possa eseguire il codice all'interno del blocco.
+                synchronized (ServerState.lockedTopics)
+                {
+                    if (ServerState.lockedTopics.isEmpty())
+                    {
                         switch (mainCommand) {
                             case "quit":
                                 server.stop();
@@ -177,7 +181,8 @@ public class CommandHandler extends Thread {
     // Invia un messaggio al topic e notifica i subscribers
     private void sendMessage(String topic, Message message) {
         List<Message> messages = ServerState.topics.get(topic);
-        synchronized (messages) {
+        synchronized (messages)
+        {
             message.setId(getNextMessageId(topic));
             messages.add(message);
         }
@@ -203,7 +208,8 @@ public class CommandHandler extends Thread {
     // Notifica tutti i subscribers del topic di un nuovo messaggio
     private void notifySubscribers(String topic, Message message) {
         Set<Socket> subscriberSockets = ServerState.subscribers.get(topic);
-        if (subscriberSockets != null) {
+        if (subscriberSockets != null)
+        {
             synchronized (subscriberSockets) {
                 for (Socket subscriberSocket : subscriberSockets) {
                     // Evita di notificare il Publisher stesso

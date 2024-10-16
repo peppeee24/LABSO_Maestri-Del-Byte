@@ -83,7 +83,8 @@ public class ClientHandler extends Thread {
                     continue;
                 }
 
-                switch (command) {
+                switch (command)
+                {
                     case "publish":
                         role = "publisher";
                         topic = argument;

@@ -26,8 +26,22 @@ public class ClientConnection {
             // Creazione del socket per connettersi al server
             socket = new Socket(serverAddress, serverPort);
             // Inizializzazione dei flussi di input e output
-            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            out = new PrintWriter(socket.getOutputStream(), true);
+
+
+            /*
+                    socket.getInputStream() (dati in byte) --> new InputStreamReader (dati in carattere) -->  new BufferedReader (Buffer di caretteri)
+             */
+
+            in = new BufferedReader(new InputStreamReader(socket.getInputStream())); // quello che ricevo
+
+            /*
+                    - Viene creato un flusso di output che invia i dati verso il socket, cioè verso la connessione di rete
+                    - Autoflush: Ogni volta che viene chiamato un metodo come println(),
+                    il buffer viene automaticamente svuotato e i dati vengono inviati immediatamente, senza aspettare ulteriori comandi.
+             */
+            out = new PrintWriter(socket.getOutputStream(), true); // cio che mando al server
+
+
             userInput = new BufferedReader(new InputStreamReader(System.in));
 
             // Autenticazione dell'utente (impostazione dell'username)
@@ -54,7 +68,8 @@ public class ClientConnection {
     }
 
     // Metodo per autenticare l'utente impostando l'username
-    private void authenticate() throws IOException {
+    private void authenticate() throws IOException
+    {
         String username;
         while (true) {
             System.out.print("Inserisci il tuo nome utente: ");
@@ -64,7 +79,8 @@ public class ClientConnection {
 
             // Legge la risposta dal server
             String response = in.readLine();
-            if (response != null) {
+            if (response != null)
+            {
                 System.out.println(response);
                 if (response.startsWith("Nome utente impostato")) {
                     break; // Username accettato dal server, esce dal loop
